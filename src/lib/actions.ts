@@ -741,6 +741,9 @@ export async function isOperatorOnly() {
 export async function loginUser(username: string, password: string) {
   console.log(`[Login] Intentando entrar con usuario: ${username}`);
   try {
+    // Sanity check: ¿Responde la DB?
+    await db.execute(sql`SELECT 1`);
+
     const result = (await db.select({
       user: users,
       access: accesses
@@ -751,7 +754,7 @@ export async function loginUser(username: string, password: string) {
 
     if (!result) {
       console.warn(`[Login] Usuario no encontrado: ${username}`);
-      return { success: false, message: "Usuario o contraseña incorrectos" };
+      return { success: false, message: "Usuario no encontrado. ¿Ejecutaste /api/setup?" };
     }
 
     console.log(`[Login] Usuario encontrado. Validando contraseña...`);
@@ -769,10 +772,14 @@ export async function loginUser(username: string, password: string) {
     }
 
     console.warn(`[Login] Contraseña incorrecta para: ${username}`);
-    return { success: false, message: "Usuario o contraseña incorrectos" };
+    return { success: false, message: "Contraseña incorrecta." };
   } catch (error) {
     console.error(`[Login Error]:`, error);
-    return { success: false, message: "Error interno del servidor al intentar entrar" };
+    const errorMsg = error instanceof Error ? error.message : "Error desconocido";
+    return {
+      success: false,
+      message: `Error de Servidor: ${errorMsg}. Asegúrate de haber entrado a /api/setup y de tener una DB activa.`
+    };
   }
 }
 
