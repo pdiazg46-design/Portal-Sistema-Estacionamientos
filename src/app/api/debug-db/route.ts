@@ -9,8 +9,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
     const diagnostics = {
         env: {
-            POSTGRES_URL: process.env.POSTGRES_URL ? "Presente (Definida)" : "Faltante (No definida)",
-            NODE_ENV: process.env.NODE_ENV
+            POSTGRES_URL: process.env.POSTGRES_URL ? "Presente (Definida)" : "Faltante",
+            DATABASE_URL: process.env.DATABASE_URL ? "Presente (Definida)" : "Faltante",
+            NODE_ENV: process.env.NODE_ENV,
+            ver: "1.0.4" // Forzar actualización de caché
         },
         connection: "Pendiente"
     };
