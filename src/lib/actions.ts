@@ -29,8 +29,13 @@ function applyChileanRounding(amount: number): number {
 }
 
 export async function getPricePerMinute(): Promise<number> {
-  const result = (await db.select().from(settings).where(eq(settings.key, "price_per_minute")))[0];
-  return result ? parseInt(result.value) : 25; // Default 25 CLP/min
+  try {
+    const result = (await db.select().from(settings).where(eq(settings.key, "price_per_minute")))[0];
+    return result ? parseInt(result.value) : 25; // Default 25 CLP/min
+  } catch (e) {
+    console.error("Error fetching price_per_minute:", e);
+    return 25;
+  }
 }
 
 export async function setPricePerMinute(price: number) {
@@ -44,8 +49,13 @@ export async function setPricePerMinute(price: number) {
 }
 
 export async function isChargingEnabled(): Promise<boolean> {
-  const result = (await db.select().from(settings).where(eq(settings.key, "charging_enabled")))[0];
-  return result ? result.value === "true" : true; // Default true
+  try {
+    const result = (await db.select().from(settings).where(eq(settings.key, "charging_enabled")))[0];
+    return result ? result.value === "true" : true; // Default true
+  } catch (e) {
+    console.error("Error fetching charging_enabled:", e);
+    return true;
+  }
 }
 
 export async function setChargingEnabled(enabled: boolean) {
@@ -59,7 +69,6 @@ export async function setChargingEnabled(enabled: boolean) {
 }
 
 export async function getBranding() {
-  const allSettings = await db.select().from(settings);
   const branding = {
     companyName: "Mi Estacionamiento",
     systemName: "Panel de Control de Estacionamientos",
@@ -67,17 +76,21 @@ export async function getBranding() {
     logoUrl: "/at-sit-logo.png"
   };
 
-  allSettings.forEach((s: any) => {
-    if (s.key === "company_name" && s.value) branding.companyName = s.value;
-    if (s.key === "system_name" && s.value) branding.systemName = s.value;
-    if (s.key === "description" && s.value) branding.description = s.value;
-    if (s.key === "logo_url" && s.value) {
-      // Only accept relative paths, http URLs, or data URIs (base64)
-      if (s.value.startsWith("/") || s.value.startsWith("http") || s.value.startsWith("data:image")) {
-        branding.logoUrl = s.value;
+  try {
+    const allSettings = await db.select().from(settings);
+    allSettings.forEach((s: any) => {
+      if (s.key === "company_name" && s.value) branding.companyName = s.value;
+      if (s.key === "system_name" && s.value) branding.systemName = s.value;
+      if (s.key === "description" && s.value) branding.description = s.value;
+      if (s.key === "logo_url" && s.value) {
+        if (s.value.startsWith("/") || s.value.startsWith("http") || s.value.startsWith("data:image")) {
+          branding.logoUrl = s.value;
+        }
       }
-    }
-  });
+    });
+  } catch (e) {
+    console.error("Error fetching branding settings:", e);
+  }
 
   return branding;
 }
