@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
 
+export const dynamic = "force-dynamic";
+
+// Last forced update: 2026-01-28 20:25
 export async function GET() {
   try {
     console.log("[Setup] Inciando creación de tablas...");
