@@ -93,6 +93,10 @@ export async function GET() {
 
     // 2. Datos base (Separados para evitar errores de ejecución múltiple)
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-a', 'Acceso Principal') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-1', 'Puerta 1') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-2', 'Puerta 2') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-3', 'Puerta 3') ON CONFLICT DO NOTHING`);
+
     await db.execute(sql`INSERT INTO settings (key, value) VALUES ('price_per_minute', '25') ON CONFLICT DO NOTHING`);
     await db.execute(sql`INSERT INTO settings (key, value) VALUES ('charging_enabled', 'true') ON CONFLICT DO NOTHING`);
     await db.execute(sql`INSERT INTO settings (key, value) VALUES ('company_name', 'Mi Estacionamiento') ON CONFLICT DO NOTHING`);
