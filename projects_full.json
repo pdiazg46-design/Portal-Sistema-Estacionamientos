@@ -1,0 +1,83 @@
+﻿{
+  "projects": [
+    {
+      "name": "parking-management",
+      "id": "prj_5AtuvRsSld3x64fXayxnBbMJHrCO",
+      "latestProductionUrl": "--",
+      "updatedAt": 1769605204268,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    },
+    {
+      "name": "portal-sistema-estacionamientos-8qps",
+      "id": "prj_wsg6eVqTNx1pOG7asiZth9m1Wilf",
+      "latestProductionUrl": "https://portal-sistema-estacionamientos-8qp-patricios-projects-c196c515.vercel.app",
+      "updatedAt": 1769604031965,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    },
+    {
+      "name": "portal-sistema-estacionamientos-l8tl",
+      "id": "prj_5qQibeL50fzWFZO7DcvZb9Gnv8dv",
+      "latestProductionUrl": "https://portal-sistema-estacionamientos-l8t-patricios-projects-c196c515.vercel.app",
+      "updatedAt": 1769603919924,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    },
+    {
+      "name": "portal-sistema-estacionamientos",
+      "id": "prj_qDgbIGnnzMddzew4u2V0chi5OuaP",
+      "latestProductionUrl": "https://portal-sistema-estacionamientos-patricios-projects-c196c515.vercel.app",
+      "updatedAt": 1769603817312,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    },
+    {
+      "name": "at-sit-portafolio",
+      "id": "prj_ebWhvjdeVehYkhvVAtn0l8BTCH0B",
+      "latestProductionUrl": "https://at-sit-portafolio.vercel.app",
+      "updatedAt": 1769562088670,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    },
+    {
+      "name": "tangente-app",
+      "id": "prj_5lAZmrb72r9NPfPuC1ldlaxqvIFN",
+      "latestProductionUrl": "https://tangente-app.vercel.app",
+      "updatedAt": 1769535761988,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    },
+    {
+      "name": "festival-app",
+      "id": "prj_DkfX4xlh4OOd8bt0Ua0zynpcmSMP",
+      "latestProductionUrl": "https://festival-app-gamma.vercel.app",
+      "updatedAt": 1769528118847,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    },
+    {
+      "name": "portal-at-sit-inmobiliario-sow7",
+      "id": "prj_WBgMGvqGhedWZIdbMnCrbRDcFgoH",
+      "latestProductionUrl": "https://portal-at-sit-inmobiliario-sow7.vercel.app",
+      "updatedAt": 1769432931599,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    },
+    {
+      "name": "portal-at-sit-inmobiliario",
+      "id": "prj_B8i4NobNrUasxjcXOvyCxm6uf8zn",
+      "latestProductionUrl": "https://portal-at-sit-inmobiliario-patricios-projects-c196c515.vercel.app",
+      "updatedAt": 1769432841804,
+      "nodeVersion": "24.x",
+      "deprecated": false
+    }
+  ],
+  "pagination": {
+    "count": 9,
+    "next": null,
+    "prev": 1769605204268
+  },
+  "contextName": "patricios-projects-c196c515",
+  "elapsed": "1s"
+}

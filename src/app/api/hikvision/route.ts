@@ -72,14 +72,13 @@ export async function POST(request: Request) {
     const normalizedPlate = plateNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
     // 4. Búsqueda en tabla de Cámaras
-    const camResults = await db.select({
+    const camResults = (await db.select({
       camera: cameras,
       access: accesses
     })
       .from(cameras)
       .innerJoin(accesses, eq(cameras.accessId, accesses.id))
-      .where(eq(cameras.deviceName, deviceName))
-      .get();
+      .where(eq(cameras.deviceName, deviceName)))[0];
 
     // Variables de decisión
     let finalAccessId = camResults?.access.id;

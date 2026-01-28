@@ -4,7 +4,7 @@ import { processVehicleEntry } from "../src/lib/actions";
 async function main() {
   try {
     console.log("Testing processVehicleEntry(ABC-102)...");
-    const result = await processVehicleEntry("ABC-102");
+    const result = await processVehicleEntry("ABC-102", "ACC-GENERIC");
     console.log("Result:", result);
   } catch (error) {
     console.error("CRITICAL ERROR:", error);

@@ -20,6 +20,7 @@ interface AuthContextType {
     isSuperAdmin: boolean;
     assignedAccessId: string | null;
     logout: () => void;
+    role: Role | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,7 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isAdmin: user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
             isSuperAdmin: user?.role === "SUPER_ADMIN",
             assignedAccessId: user?.accessId || null,
-            logout
+            logout,
+            role: user?.role || null
         }}>
             {children}
         </AuthContext.Provider>

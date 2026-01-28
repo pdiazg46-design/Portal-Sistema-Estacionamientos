@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 
 export default function TrialControl({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<{ expired: boolean; daysLeft: number } | null>(null);
-    const { setRole } = useAuth();
+    const { user, setUser } = useAuth();
     const [isOperatorMode, setIsOperatorMode] = useState(false);
 
     useEffect(() => {
@@ -16,13 +16,13 @@ export default function TrialControl({ children }: { children: React.ReactNode }
             setStatus(res);
 
             const opOnly = await isOperatorOnly();
-            if (opOnly) {
+            if (opOnly && user && user.role !== "OPERATOR") {
                 setIsOperatorMode(true);
-                setRole("OPERATOR");
+                setUser({ ...user, role: "OPERATOR" });
             }
         }
         check();
-    }, [setRole]);
+    }, [user, setUser]);
 
     if (!status) return null;
 
