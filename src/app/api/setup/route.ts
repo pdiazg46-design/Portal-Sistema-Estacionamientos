@@ -2,13 +2,16 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 
 export const dynamic = "force-dynamic";
 
-// Last forced update: 2026-01-28 20:25
+// Last forced update: 2026-01-28 20:49
 export async function GET() {
   try {
     console.log("[Setup] Inciando creación de tablas...");
+
+    // ... (rest of the file remains the same until return)
 
     // 1. Crear Tablas
     await db.execute(sql`
@@ -110,6 +113,8 @@ export async function GET() {
       VALUES ('admin-init', 'Pdiaz', 'Pdiaz8249', 'pdiazg46@gmail.com', 'SUPER_ADMIN')
       ON CONFLICT (username) DO UPDATE SET role = 'SUPER_ADMIN'
     `);
+
+    revalidatePath('/');
 
     return NextResponse.json({
       success: true,
