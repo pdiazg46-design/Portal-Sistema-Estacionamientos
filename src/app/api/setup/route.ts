@@ -91,21 +91,20 @@ export async function GET() {
 
     console.log("[Setup] Tablas creadas. Insertando datos iniciales...");
 
-    // 2. Datos base
-    await db.execute(sql`
-      INSERT INTO accesses (id, name) VALUES ('gate-a', 'Acceso Principal') ON CONFLICT DO NOTHING;
-      INSERT INTO settings (key, value) VALUES ('price_per_minute', '25') ON CONFLICT DO NOTHING;
-      INSERT INTO settings (key, value) VALUES ('charging_enabled', 'true') ON CONFLICT DO NOTHING;
-      INSERT INTO settings (key, value) VALUES ('company_name', 'Mi Estacionamiento') ON CONFLICT DO NOTHING;
-      INSERT INTO settings (key, value) VALUES ('system_name', 'Gestión de Estacionamientos') ON CONFLICT DO NOTHING;
-      INSERT INTO settings (key, value) VALUES ('description', 'Sistema de Control de Acceso Vehicular') ON CONFLICT DO NOTHING;
-      INSERT INTO settings (key, value) VALUES ('install_date', ${Math.floor(Date.now() / 1000).toString()}) ON CONFLICT DO NOTHING;
-    `);
+    // 2. Datos base (Separados para evitar errores de ejecución múltiple)
+    await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-a', 'Acceso Principal') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO settings (key, value) VALUES ('price_per_minute', '25') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO settings (key, value) VALUES ('charging_enabled', 'true') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO settings (key, value) VALUES ('company_name', 'Mi Estacionamiento') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO settings (key, value) VALUES ('system_name', 'Gestión de Estacionamientos') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO settings (key, value) VALUES ('description', 'Sistema de Control de Acceso Vehicular') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`INSERT INTO settings (key, value) VALUES ('install_date', ${Math.floor(Date.now() / 1000).toString()}) ON CONFLICT DO NOTHING`);
 
+    // 3. Usuario Admin
     await db.execute(sql`
       INSERT INTO users (id, username, password, email, role) 
       VALUES ('admin-init', 'Pdiaz', 'Pdiaz8249', 'pdiazg46@gmail.com', 'SUPER_ADMIN')
-      ON CONFLICT (username) DO UPDATE SET role = 'SUPER_ADMIN';
+      ON CONFLICT (username) DO UPDATE SET role = 'SUPER_ADMIN'
     `);
 
     return NextResponse.json({
