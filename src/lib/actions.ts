@@ -739,26 +739,41 @@ export async function isOperatorOnly() {
 // USER MANAGEMENT ACTIONS
 
 export async function loginUser(username: string, password: string) {
-  const result = (await db.select({
-    user: users,
-    access: accesses
-  })
-    .from(users)
-    .leftJoin(accesses, eq(users.accessId, accesses.id))
-    .where(eq(users.username, username)))[0];
+  console.log(`[Login] Intentando entrar con usuario: ${username}`);
+  try {
+    const result = (await db.select({
+      user: users,
+      access: accesses
+    })
+      .from(users)
+      .leftJoin(accesses, eq(users.accessId, accesses.id))
+      .where(eq(users.username, username)))[0];
 
-  if (result && result.user.password === password) {
-    const { password: _, ...userWithoutPassword } = result.user;
-    return {
-      success: true,
-      user: {
-        ...userWithoutPassword,
-        accessName: result.access?.name
-      }
-    };
+    if (!result) {
+      console.warn(`[Login] Usuario no encontrado: ${username}`);
+      return { success: false, message: "Usuario o contraseña incorrectos" };
+    }
+
+    console.log(`[Login] Usuario encontrado. Validando contraseña...`);
+
+    if (result.user.password === password) {
+      const { password: _, ...userWithoutPassword } = result.user;
+      console.log(`[Login] Éxito para: ${username} (Rol: ${result.user.role})`);
+      return {
+        success: true,
+        user: {
+          ...userWithoutPassword,
+          accessName: result.access?.name
+        }
+      };
+    }
+
+    console.warn(`[Login] Contraseña incorrecta para: ${username}`);
+    return { success: false, message: "Usuario o contraseña incorrectos" };
+  } catch (error) {
+    console.error(`[Login Error]:`, error);
+    return { success: false, message: "Error interno del servidor al intentar entrar" };
   }
-
-  return { success: false, message: "Usuario o contraseña incorrectos" };
 }
 
 export async function getUsers() {
