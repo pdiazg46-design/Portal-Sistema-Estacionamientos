@@ -6,7 +6,7 @@ import { accesses } from '@/lib/schema';
 
 export const dynamic = "force-dynamic";
 
-// Last forced update: 2026-01-28 20:25
+// Last forced update: 2026-01-28 20:53
 export async function GET() {
     const mask = (str: string | undefined) => str ? `${str.substring(0, 8)}...` : "Faltante";
 
@@ -15,7 +15,7 @@ export async function GET() {
             POSTGRES_URL: mask(process.env.POSTGRES_URL),
             DATABASE_URL: mask(process.env.DATABASE_URL),
             NODE_ENV: process.env.NODE_ENV,
-            ver: "1.0.6" // Incrementar versión
+            ver: "1.0.7" // Incrementar versión
         },
         connection: "Pendiente",
         accesses: [] as string[]

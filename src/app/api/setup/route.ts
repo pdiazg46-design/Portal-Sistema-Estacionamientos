@@ -94,9 +94,23 @@ export async function GET() {
 
     console.log("[Setup] Tablas creadas. Insertando datos iniciales...");
 
-    // 2. Datos base (Saneamiento: Solo puertas 1, 2 y 3)
-    await db.execute(sql`DELETE FROM accesses WHERE id = 'gate-a'`);
+    // 2. Datos base (Saneamiento Total: Solo puertas 1, 2 y 3)
+    console.log("[Setup] Limpiando accesos antiguos...");
+
+    // Primero desvinculamos referencias para evitar errores de Foreign Key
+    await db.execute(sql`UPDATE users SET access_id = NULL WHERE access_id = 'gate-a'`);
+    await db.execute(sql`UPDATE parking_spots SET access_id = NULL WHERE access_id = 'gate-a'`);
+    await db.execute(sql`UPDATE parking_records SET entry_access_id = NULL WHERE entry_access_id = 'gate-a'`);
+    await db.execute(sql`UPDATE parking_records SET exit_access_id = NULL WHERE exit_access_id = 'gate-a'`);
+
+    // Si hay cámaras, las movemos temporalmente a la Puerta 1
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-1', 'Puerta 1') ON CONFLICT DO NOTHING`);
+    await db.execute(sql`UPDATE cameras SET access_id = 'gate-1' WHERE access_id = 'gate-a'`);
+
+    // Ahora sí, eliminamos el Acceso Principal definitivamente
+    await db.execute(sql`DELETE FROM accesses WHERE id = 'gate-a'`);
+
+    // Aseguramos las otras puertas
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-2', 'Puerta 2') ON CONFLICT DO NOTHING`);
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-3', 'Puerta 3') ON CONFLICT DO NOTHING`);
 
