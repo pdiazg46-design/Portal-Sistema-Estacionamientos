@@ -1,12 +1,17 @@
-import { sql } from "@vercel/postgres";
+import { createPool } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import * as schema from "./schema";
 
-// Validación de conexión mejorada
-const url = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+// Buscar cualquier variable de conexión disponible
+const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 
-if (process.env.NODE_ENV === "production" && !url) {
-    console.error("❌ ERROR CRÍTICO: No se encontró POSTGRES_URL ni DATABASE_URL.");
+if (process.env.NODE_ENV === "production" && !connectionString) {
+    console.error("❌ ERROR CRÍTICO: No se encontró POSTGRES_URL ni DATABASE_URL en el entorno.");
 }
 
-export const db = drizzle(sql, { schema });
+// Crear el pool manualmente para asegurar que use la variable correcta
+const pool = createPool({
+    connectionString: connectionString
+});
+
+export const db = drizzle(pool, { schema });
