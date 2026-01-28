@@ -4,11 +4,11 @@ import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
 
 export async function GET() {
-    try {
-        console.log("[Setup] Inciando creación de tablas...");
+  try {
+    console.log("[Setup] Inciando creación de tablas...");
 
-        // 1. Crear Tablas
-        await db.execute(sql`
+    // 1. Crear Tablas
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS accesses (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -16,7 +16,7 @@ export async function GET() {
       );
     `);
 
-        await db.execute(sql`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS cameras (
         id TEXT PRIMARY KEY,
         device_name TEXT NOT NULL UNIQUE,
@@ -25,7 +25,7 @@ export async function GET() {
       );
     `);
 
-        await db.execute(sql`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS parking_spots (
         id SERIAL PRIMARY KEY,
         code TEXT NOT NULL,
@@ -38,7 +38,7 @@ export async function GET() {
       );
     `);
 
-        await db.execute(sql`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS staff_members (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -51,7 +51,7 @@ export async function GET() {
       );
     `);
 
-        await db.execute(sql`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS parking_records (
         id TEXT PRIMARY KEY,
         license_plate TEXT NOT NULL,
@@ -66,7 +66,7 @@ export async function GET() {
       );
     `);
 
-        await db.execute(sql`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS settings (
         id SERIAL PRIMARY KEY,
         key TEXT NOT NULL UNIQUE,
@@ -74,7 +74,7 @@ export async function GET() {
       );
     `);
 
-        await db.execute(sql`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT NOT NULL UNIQUE,
@@ -86,10 +86,10 @@ export async function GET() {
       );
     `);
 
-        console.log("[Setup] Tablas creadas. Insertando datos iniciales...");
+    console.log("[Setup] Tablas creadas. Insertando datos iniciales...");
 
-        // 2. Datos base
-        await db.execute(sql`
+    // 2. Datos base
+    await db.execute(sql`
       INSERT INTO accesses (id, name) VALUES ('gate-a', 'Acceso Principal') ON CONFLICT DO NOTHING;
       INSERT INTO settings (key, value) VALUES ('price_per_minute', '25') ON CONFLICT DO NOTHING;
       INSERT INTO settings (key, value) VALUES ('charging_enabled', 'true') ON CONFLICT DO NOTHING;
@@ -99,23 +99,22 @@ export async function GET() {
       INSERT INTO settings (key, value) VALUES ('install_date', ${Math.floor(Date.now() / 1000).toString()}) ON CONFLICT DO NOTHING;
     `);
 
-        // 3. Usuario Admin
-        await db.execute(sql`
+    await db.execute(sql`
       INSERT INTO users (id, username, password, email, role) 
-      VALUES ('admin-init', 'Pdiaz', 'Pdiaz8249', 'pdiazg46@gmail.com', 'ADMIN')
-      ON CONFLICT DO NOTHING;
+      VALUES ('admin-init', 'Pdiaz', 'Pdiaz8249', 'pdiazg46@gmail.com', 'SUPER_ADMIN')
+      ON CONFLICT (username) DO UPDATE SET role = 'SUPER_ADMIN';
     `);
 
-        return NextResponse.json({
-            success: true,
-            message: "Base de datos inicializada correctamente. Ya puedes volver al inicio."
-        });
+    return NextResponse.json({
+      success: true,
+      message: "Base de datos inicializada correctamente. Ya puedes volver al inicio."
+    });
 
-    } catch (error) {
-        console.error("[Setup Error]:", error);
-        return NextResponse.json({
-            success: false,
-            error: error instanceof Error ? error.message : "Error desconocido"
-        }, { status: 500 });
-    }
+  } catch (error) {
+    console.error("[Setup Error]:", error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error desconocido"
+    }, { status: 500 });
+  }
 }
