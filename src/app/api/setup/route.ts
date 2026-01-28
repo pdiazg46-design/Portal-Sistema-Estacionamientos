@@ -94,8 +94,8 @@ export async function GET() {
 
     console.log("[Setup] Tablas creadas. Insertando datos iniciales...");
 
-    // 2. Datos base (Separados para evitar errores de ejecución múltiple)
-    await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-a', 'Acceso Principal') ON CONFLICT DO NOTHING`);
+    // 2. Datos base (Saneamiento: Solo puertas 1, 2 y 3)
+    await db.execute(sql`DELETE FROM accesses WHERE id = 'gate-a'`);
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-1', 'Puerta 1') ON CONFLICT DO NOTHING`);
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-2', 'Puerta 2') ON CONFLICT DO NOTHING`);
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-3', 'Puerta 3') ON CONFLICT DO NOTHING`);
