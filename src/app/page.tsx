@@ -22,6 +22,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
+  let spots: any[] = [];
+  let staff: any[] = [];
+  let activeRecords: any[] = [];
+  let gates: any[] = [];
+  let recentActivity: any[] = [];
   let entriesToday: any[] = [];
   let revenueToday = 0;
 
@@ -59,7 +64,6 @@ export default async function Home() {
 
   } catch (e) {
     console.error("Critical error fetching initial dashboard data:", e);
-    // If DB fails, we continue with empty arrays to allow render
   }
 
   const enrichedSpots = spots.map((spot: any) => {
