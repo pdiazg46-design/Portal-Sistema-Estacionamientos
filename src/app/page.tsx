@@ -165,7 +165,7 @@ export default async function Home() {
         }}>
           <StatCard title="Total Sitios" value={totalSpots} icon="🅿️" />
           <StatCard title="Disponibles" value={availableSpots} valueColor="var(--success)" icon="✅" />
-          <StatCard title="Ocupados" value={occupiedSpots} valueColor="var(--error)" icon="🚗" extra={`${((occupiedSpots / totalSpots) * 100).toFixed(1)}%`} />
+          <StatCard title="Ocupados" value={occupiedSpots} valueColor="var(--error)" icon="🚗" extra={totalSpots > 0 ? `${((occupiedSpots / totalSpots) * 100).toFixed(1)}%` : "0%"} />
           <StatCard title="Reservados" value={reservedSpotsTotal} icon="👤" />
           <StatCard title="En Vacaciones" value={staffOnVacation} valueColor="var(--warning)" icon="🌴" />
         </div>

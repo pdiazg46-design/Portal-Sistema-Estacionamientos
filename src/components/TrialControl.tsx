@@ -12,13 +12,19 @@ export default function TrialControl({ children }: { children: React.ReactNode }
 
     useEffect(() => {
         async function check() {
-            const res = await getTrialStatus();
-            setStatus(res);
+            try {
+                const res = await getTrialStatus();
+                setStatus(res);
 
-            const opOnly = await isOperatorOnly();
-            if (opOnly && user && user.role !== "OPERATOR") {
-                setIsOperatorMode(true);
-                setUser({ ...user, role: "OPERATOR" });
+                const opOnly = await isOperatorOnly();
+                if (opOnly && user && user.role !== "OPERATOR") {
+                    setIsOperatorMode(true);
+                    setUser({ ...user, role: "OPERATOR" });
+                }
+            } catch (e) {
+                console.error("Trial check failed (DB might be empty):", e);
+                // Fallback safe to allow rendering
+                setStatus({ expired: false, daysLeft: 15 });
             }
         }
         check();
