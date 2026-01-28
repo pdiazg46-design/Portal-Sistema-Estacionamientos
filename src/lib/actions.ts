@@ -648,6 +648,14 @@ export async function updateSpotCounts(totalCount: number, towerId: string = "T1
   const allSpots = await db.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId));
   const currentCount = allSpots.length;
 
+  // Mapa automático de Torre a Puerta
+  const gateMapping: Record<string, string> = {
+    "T1": "gate-1",
+    "T2": "gate-2",
+    "T3": "gate-3"
+  };
+  const targetGateId = gateMapping[towerId];
+
   await db.transaction(async (tx) => {
     if (totalCount > currentCount) {
       // Add new spots as General by default
@@ -655,6 +663,7 @@ export async function updateSpotCounts(totalCount: number, towerId: string = "T1
         await tx.insert(parkingSpots).values({
           code: `${towerId}-${i.toString().padStart(2, '0')}`,
           towerId,
+          accessId: targetGateId, // Vincular a la puerta correspondiente
           type: "GENERAL",
           isOccupied: false
         });
@@ -673,10 +682,14 @@ export async function updateSpotCounts(totalCount: number, towerId: string = "T1
 
     // FINAL STEP: Sequential Renumbering (The "Fixed Asset" logic)
     // Ensures codes are always T1-01, T1-02... Regardless of history
+    // UPDATED: Also ensure accessId is correctly set for all spots in this tower
     const finalSpots = (await tx.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId))).sort((a, b) => a.id - b.id);
     for (const [idx, spot] of finalSpots.entries()) {
       await tx.update(parkingSpots)
-        .set({ code: `${towerId}-${(idx + 1).toString().padStart(2, '0')}` })
+        .set({
+          code: `${towerId}-${(idx + 1).toString().padStart(2, '0')}`,
+          accessId: targetGateId // Corregir vinculación si era nula
+        })
         .where(eq(parkingSpots.id, spot.id));
     }
   });

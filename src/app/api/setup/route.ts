@@ -114,6 +114,11 @@ export async function GET() {
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-2', 'Puerta 2') ON CONFLICT DO NOTHING`);
     await db.execute(sql`INSERT INTO accesses (id, name) VALUES ('gate-3', 'Puerta 3') ON CONFLICT DO NOTHING`);
 
+    // Vincular estacionamientos existentes a sus puertas correspondientes
+    await db.execute(sql`UPDATE parking_spots SET access_id = 'gate-1' WHERE tower_id = 'T1'`);
+    await db.execute(sql`UPDATE parking_spots SET access_id = 'gate-2' WHERE tower_id = 'T2'`);
+    await db.execute(sql`UPDATE parking_spots SET access_id = 'gate-3' WHERE tower_id = 'T3'`);
+
     await db.execute(sql`INSERT INTO settings (key, value) VALUES ('price_per_minute', '25') ON CONFLICT DO NOTHING`);
     await db.execute(sql`INSERT INTO settings (key, value) VALUES ('charging_enabled', 'true') ON CONFLICT DO NOTHING`);
     await db.execute(sql`INSERT INTO settings (key, value) VALUES ('company_name', 'Mi Estacionamiento') ON CONFLICT DO NOTHING`);
