@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
-import { accesses } from '@/lib/schema';
+import { accesses, parkingSpots } from '@/lib/schema';
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,16 @@ export async function GET() {
         diagnostics.connection = "Exitosa ✅";
 
         const accs = await db.select().from(accesses);
-        diagnostics.accesses = accs.map(a => a.name);
+        diagnostics.accesses = accs.map(a => ({ id: a.id, name: a.name }));
+
+        const allSpots = await db.select().from(parkingSpots);
+        const stats: Record<string, number> = {};
+        allSpots.forEach(s => {
+            const key = `Torre ${s.towerId || '?'}, Puerta ${s.accessId || '?'}`;
+            stats[key] = (stats[key] || 0) + 1;
+        });
+        (diagnostics as any).spotsDistribution = stats;
+        (diagnostics as any).totalSpots = allSpots.length;
     } catch (error) {
         diagnostics.connection = `Falló ❌: ${error instanceof Error ? error.message : "Error desconocido"}`;
     }
