@@ -18,7 +18,7 @@ export async function GET() {
             ver: "1.0.7" // Incrementar versión
         },
         connection: "Pendiente",
-        accesses: [] as string[]
+        accesses: [] as any[]
     };
 
     try {
