@@ -128,9 +128,9 @@ export async function GET() {
 
     // 3. Usuario Admin
     await db.execute(sql`
-      INSERT INTO users (id, username, password, email, role) 
-      VALUES ('admin-init', 'Pdiaz', 'Pdiaz8249', 'pdiazg46@gmail.com', 'SUPER_ADMIN')
-      ON CONFLICT (username) DO UPDATE SET role = 'SUPER_ADMIN'
+      INSERT INTO users (id, username, password, email, role, access_id) 
+      VALUES ('admin-init', 'Pdiaz', 'Pdiaz8249', 'pdiazg46@gmail.com', 'SUPER_ADMIN', NULL)
+      ON CONFLICT (username) DO UPDATE SET role = 'SUPER_ADMIN', access_id = NULL
     `);
 
     revalidatePath('/');
