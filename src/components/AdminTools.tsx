@@ -41,6 +41,8 @@ export default function AdminTools() {
 
     return (
         <div style={{ display: "flex", gap: "10px" }}>
+            {/* Simulation and Clear buttons hidden by request to avoid accidental data loss */}
+            {/* 
             <button
                 onClick={handleSimulate}
                 disabled={loading}
@@ -75,6 +77,7 @@ export default function AdminTools() {
             >
                 {loading ? "..." : "🗑️ Limpiar Historial"}
             </button>
+            */}
             <a
                 href="/reports"
                 style={{
