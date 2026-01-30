@@ -7,7 +7,7 @@ import UserManager from "@/components/UserManager";
 import LogoUpload from "@/components/LogoUpload";
 import { db } from "@/lib/db";
 import { parkingSpots, staffMembers, parkingRecords, accesses } from "@/lib/schema";
-import { isNull, desc, sql, eq } from "drizzle-orm";
+import { isNull, desc, sql, eq, asc } from "drizzle-orm";
 import Image from "next/image";
 import { Metadata } from "next";
 
@@ -31,7 +31,7 @@ export default async function Home() {
   let revenueToday = 0;
 
   try {
-    spots = await db.select().from(parkingSpots);
+    spots = await db.select().from(parkingSpots).orderBy(asc(parkingSpots.code));
     staff = await db.select().from(staffMembers);
     activeRecords = await db.select().from(parkingRecords).where(isNull(parkingRecords.exitTime));
     gates = await db.select().from(accesses);
