@@ -15,28 +15,7 @@ if (isProd) {
     dbInstance = drizzle(sql, { schema });
 } else {
     // Fallback: Local SQLite (Hybrid Mode)
-    console.warn("⚠️ NO POSTGRES_URL FOUND.");
-    console.warn("⚠️ Local SQLite temporarily disabled for build debugging.");
-
-    // MOCK DB to prevent crash, but queries will fail locally
-    dbInstance = {
-        select: () => ({
-            from: () => ({
-                where: () => [],
-                leftJoin: () => ({ where: () => [] }),
-                innerJoin: () => ({ where: () => [] }),
-                orderBy: () => [],
-                limit: () => []
-            })
-        }),
-        insert: () => ({ values: () => ({}) }),
-        update: () => ({ set: () => ({ where: () => ({}) }) }),
-        delete: () => ({ where: () => ({}) }),
-        transaction: async (cb: any) => { await cb(dbInstance); },
-        execute: () => ({})
-    } as any;
-
-    /*
+    console.warn("⚠️ NO POSTGRES_URL FOUND. Using Local SQLite (parking.db).");
     try {
         // Use eval("require") to prevent Webpack from trying to bundle these native modules
         const requireFunc = eval("require");
@@ -61,7 +40,6 @@ if (isProd) {
             // Add other methods as needed to prevent immediate crash
         } as any;
     }
-    */
 }
 
 export const db = dbInstance;
