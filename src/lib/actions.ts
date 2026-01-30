@@ -194,13 +194,15 @@ export async function occupySpot(spotId: number, licensePlate: string, type: "AU
       });
     });
     console.log(`[Action] Successfully occupied spot ${spotId} with plate ${licensePlate}`);
+
+    // IMPORTANT: Call revalidate inside the function before returning
+    safeRevalidate();
+
     return { success: true };
   } catch (error) {
     console.error(`[Action] Error in occupySpot:`, error);
     throw error;
   }
-
-  safeRevalidate();
 }
 
 export async function freeSpot(spotId: number) {
