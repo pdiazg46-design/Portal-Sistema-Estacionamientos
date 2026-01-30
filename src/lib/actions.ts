@@ -27,6 +27,11 @@ function applyChileanRounding(amount: number): number {
   return Math.round(amount / 10) * 10;
 }
 
+export function normalizePlate(plate: string): string {
+  if (!plate) return "";
+  return plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
 export async function getPricePerMinute(): Promise<number> {
   try {
     const result = (await db.select().from(settings).where(eq(settings.key, "price_per_minute")))[0];
@@ -116,8 +121,9 @@ export async function updateBranding(data: { companyName?: string, systemName?: 
 
 export async function processVehicleEntry(licensePlate: string, accessId: string): Promise<AccessResult> {
   const today = new Date();
+  const normalizedPlate = normalizePlate(licensePlate);
 
-  const staffResults = await db.select().from(staffMembers).where(eq(staffMembers.licensePlate, licensePlate));
+  const staffResults = await db.select().from(staffMembers).where(eq(staffMembers.licensePlate, normalizedPlate));
   const staff = staffResults[0];
 
   if (staff) {
@@ -130,7 +136,7 @@ export async function processVehicleEntry(licensePlate: string, accessId: string
       const spot = spotResults[0];
 
       if (spot && !spot.isOccupied) {
-        await occupySpot(spot.id, licensePlate, "AUTOMATIC", accessId);
+        await occupySpot(spot.id, normalizedPlate, "AUTOMATIC", accessId);
         return {
           allowed: true,
           message: `Bienvenido ${staff.name} (Abonado). Acceso Automático a Sitio ${spot.code}`,
@@ -166,7 +172,8 @@ export async function processVehicleEntry(licensePlate: string, accessId: string
 
 
 export async function occupySpot(spotId: number, licensePlate: string, type: "AUTOMATIC" | "MANUAL", accessId?: string) {
-  console.log(`[Action] Attempting occupySpot: Spot ${spotId}, Plate ${licensePlate}, Type ${type}`);
+  const normalizedPlate = normalizePlate(licensePlate);
+  console.log(`[Action] Attempting occupySpot: Spot ${spotId}, Plate ${normalizedPlate}, Type ${type}`);
   try {
     // Detective Debugging Check: Ensure spot isn't ALREADY occupied before doing anything
     const spot = (await db.select().from(parkingSpots).where(eq(parkingSpots.id, spotId)))[0];
@@ -186,14 +193,14 @@ export async function occupySpot(spotId: number, licensePlate: string, type: "AU
         .where(eq(parkingSpots.id, spotId));
 
       await tx.insert(parkingRecords).values({
-        licensePlate,
+        licensePlate: normalizedPlate,
         spotId,
         entryType: type,
         entryAccessId: accessId,
         entryTime: new Date()
       });
     });
-    console.log(`[Action] Successfully occupied spot ${spotId} with plate ${licensePlate}`);
+    console.log(`[Action] Successfully occupied spot ${spotId} with plate ${normalizedPlate}`);
 
     // IMPORTANT: Call revalidate inside the function before returning
     safeRevalidate();
@@ -261,6 +268,7 @@ export async function freeSpot(spotId: number) {
 }
 
 export async function updateSpotAssignment(spotId: number, data: { name: string; plate: string; phone: string; vacationStart?: Date | null; vacationEnd?: Date | null }) {
+  const normalizedPlate = normalizePlate(data.plate);
   const currentStaffResult = await db.select().from(staffMembers).where(eq(staffMembers.assignedSpotId, spotId));
   const currentStaff = currentStaffResult[0];
 
@@ -269,7 +277,7 @@ export async function updateSpotAssignment(spotId: number, data: { name: string;
       await tx.update(staffMembers)
         .set({
           name: data.name,
-          licensePlate: data.plate,
+          licensePlate: normalizedPlate,
           phoneNumber: data.phone,
           vacationStart: data.vacationStart,
           vacationEnd: data.vacationEnd
@@ -278,7 +286,7 @@ export async function updateSpotAssignment(spotId: number, data: { name: string;
     } else {
       await tx.insert(staffMembers).values({
         name: data.name,
-        licensePlate: data.plate,
+        licensePlate: normalizedPlate,
         phoneNumber: data.phone,
         role: "Abonado",
         assignedSpotId: spotId,
@@ -302,8 +310,9 @@ export async function removeSpotAssignment(spotId: number) {
 
 
 export async function processVehicleExit(licensePlate: string, accessId: string) {
+  const normalizedPlate = normalizePlate(licensePlate);
   const activeRecordResults = await db.select().from(parkingRecords)
-    .where(and(eq(parkingRecords.licensePlate, licensePlate), isNull(parkingRecords.exitTime)));
+    .where(and(eq(parkingRecords.licensePlate, normalizedPlate), isNull(parkingRecords.exitTime)));
   const record = activeRecordResults[0];
 
   if (record && record.spotId) {

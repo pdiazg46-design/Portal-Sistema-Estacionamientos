@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { processVehicleEntry, processVehicleExit, occupySpot, getAvailableGeneralSpots } from '@/lib/actions';
+import { processVehicleEntry, processVehicleExit, occupySpot, getAvailableGeneralSpots, normalizePlate } from '@/lib/actions';
 import { db } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { cameras, accesses } from '@/lib/schema';
@@ -86,8 +86,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "No se encontró patente en el payload" }, { status: 400 });
     }
 
-    // normalizar patente
-    const normalizedPlate = plateNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    // normalizar patente (Usando el helper central)
+    const normalizedPlate = normalizePlate(plateNumber);
 
     // 4. Detección de Dirección (Sense of traffic)
     let detectedDirection: "ENTRY" | "EXIT" | null = null;
