@@ -82,14 +82,13 @@ export async function POST(request: Request) {
     }
 
     // 5. Búsqueda en tabla de Cámaras
-    const camResults = await db.select({
+    const camResults = (await db.select({
       camera: cameras,
       access: accesses
     })
       .from(cameras)
       .innerJoin(accesses, eq(cameras.accessId as any, accesses.id as any))
-      .where(eq(cameras.deviceName as any, deviceName))
-      .then((res: any) => res[0]);
+      .where(eq(cameras.deviceName as any, deviceName)))[0];
 
     // Variables de decisión
     let finalAccessId = camResults?.access.id;

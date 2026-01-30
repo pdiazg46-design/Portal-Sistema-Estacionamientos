@@ -22,31 +22,53 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const spots = await db.select().from(parkingSpots).all();
-  const staff = await db.select().from(staffMembers).all();
-  const activeRecords = await db.select().from(parkingRecords).where(isNull(parkingRecords.exitTime)).all();
-  const gates = await db.select().from(accesses).all();
+  let spots: any[] = [];
+  let staff: any[] = [];
+  let activeRecords: any[] = [];
+  let gates: any[] = [];
+  let recentActivity: any[] = [];
+  let entriesToday: any[] = [];
+  let revenueToday = 0;
 
-  // Fetch recent activity
-  const recentActivity = await db.select({
-    id: parkingRecords.id,
-    licensePlate: parkingRecords.licensePlate,
-    entryTime: parkingRecords.entryTime,
-    exitTime: parkingRecords.exitTime,
-    spotId: parkingRecords.spotId,
-    entryType: parkingRecords.entryType,
-    cost: parkingRecords.cost,
-    spotCode: parkingSpots.code,
-  })
-    .from(parkingRecords)
-    .leftJoin(parkingSpots, eq(parkingRecords.spotId, parkingSpots.id))
-    .orderBy(sql`coalesce(${parkingRecords.exitTime}, ${parkingRecords.entryTime}) desc`)
-    .limit(10)
-    .all();
+  try {
+    spots = await db.select().from(parkingSpots);
+    staff = await db.select().from(staffMembers);
+    activeRecords = await db.select().from(parkingRecords).where(isNull(parkingRecords.exitTime));
+    gates = await db.select().from(accesses);
+
+    // Fetch recent activity
+    recentActivity = await db.select({
+      id: parkingRecords.id,
+      licensePlate: parkingRecords.licensePlate,
+      entryTime: parkingRecords.entryTime,
+      exitTime: parkingRecords.exitTime,
+      spotId: parkingRecords.spotId,
+      entryType: parkingRecords.entryType,
+      cost: parkingRecords.cost,
+      spotCode: parkingSpots.code,
+    })
+      .from(parkingRecords)
+      .leftJoin(parkingSpots, eq(parkingRecords.spotId, parkingSpots.id))
+      .orderBy(sql`coalesce(${parkingRecords.exitTime}, ${parkingRecords.entryTime}) desc`)
+      .limit(10);
+
+    // Financial Stats Today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    entriesToday = await db.select()
+      .from(parkingRecords)
+      .where(sql`${parkingRecords.entryTime} >= ${todayStart.getTime() / 1000}`);
+
+    revenueToday = entriesToday.reduce((sum: number, r: any) => sum + (r.cost || 0), 0);
+
+  } catch (e) {
+    console.error("Critical error fetching initial dashboard data:", e);
+  }
 
   const enrichedSpots = spots.map((spot: any) => {
-    const assignedStaff = staff.find((s: any) => s.assignedSpotId === spot.id);
-    const activeRecord = activeRecords.find((r: any) => r.spotId === spot.id);
+    const assignedStaff: any = staff.find((s: any) => s.assignedSpotId === spot.id);
+    const activeRecord: any = activeRecords.find((r: any) => r.spotId === spot.id);
 
     return {
       ...spot,
@@ -56,7 +78,7 @@ export default async function Home() {
       vacationStart: assignedStaff && assignedStaff.vacationStart ? assignedStaff.vacationStart.toISOString() : undefined,
       vacationEnd: assignedStaff && assignedStaff.vacationEnd ? assignedStaff.vacationEnd.toISOString() : undefined,
       currentPlate: activeRecord ? activeRecord.licensePlate : undefined,
-      entryTime: activeRecord ? activeRecord.entryTime.toISOString() : undefined,
+      entryTime: activeRecord && activeRecord.entryTime ? activeRecord.entryTime.toISOString() : undefined,
       monthlyFee: spot.monthlyFee ?? undefined,
       accessId: spot.accessId ?? undefined
     };
@@ -78,22 +100,11 @@ export default async function Home() {
   const chargingEnabled = await isChargingEnabled();
   const branding = await getBranding();
 
-  // Financial Stats Today
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const entriesToday = await db.select()
-    .from(parkingRecords)
-    .where(sql`${parkingRecords.entryTime} >= ${todayStart.getTime() / 1000}`)
-    .all();
-
-  const revenueToday = entriesToday.reduce((sum: any, r: any) => sum + (r.cost || 0), 0);
-
   // Projected revenue (cars currently inside - Manual only)
   const pendingRevenue = activeRecords
     .filter((r: any) => r.entryType === "MANUAL")
-    .reduce((sum: any, r: any) => {
-      const durationMins = (new Date().getTime() - r.entryTime.getTime()) / (1000 * 60);
+    .reduce((sum: number, r: any) => {
+      const durationMins = (new Date().getTime() - (r.entryTime ? r.entryTime.getTime() : 0)) / (1000 * 60);
       const rawCost = durationMins * currentPrice;
       const rounded = Math.round(rawCost / 10) * 10;
       return sum + rounded;
@@ -167,7 +178,7 @@ export default async function Home() {
         }}>
           <StatCard title="Total Sitios" value={totalSpots} icon="🅿️" />
           <StatCard title="Disponibles" value={availableSpots} valueColor="var(--success)" icon="✅" />
-          <StatCard title="Ocupados" value={occupiedSpots} valueColor="var(--error)" icon="🚗" extra={`${((occupiedSpots / totalSpots) * 100).toFixed(1)}%`} />
+          <StatCard title="Ocupados" value={occupiedSpots} valueColor="var(--error)" icon="🚗" extra={totalSpots > 0 ? `${((occupiedSpots / totalSpots) * 100).toFixed(1)}%` : "0%"} />
           <StatCard title="Reservados" value={reservedSpotsTotal} icon="👤" />
           <StatCard title="En Vacaciones" value={staffOnVacation} valueColor="var(--warning)" icon="🌴" />
         </div>
@@ -223,4 +234,3 @@ function StatCard({ title, value, valueColor, icon, extra }: { title: string, va
     </div>
   );
 }
-

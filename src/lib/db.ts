@@ -1,9 +1,10 @@
-import { sql } from "@vercel/postgres";
+import { createPool } from "@vercel/postgres";
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import * as schema from "./schema";
-import dotenv from "dotenv";
+import { sql } from "@vercel/postgres";
 
-dotenv.config();
+// Buscar cualquier variable de conexión disponible
+const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 
 // Helper to determine mode
 const isProd = !!process.env.POSTGRES_URL;

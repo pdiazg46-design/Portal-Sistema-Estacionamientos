@@ -7,22 +7,28 @@ import { useAuth } from "@/lib/AuthContext";
 
 export default function TrialControl({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<{ expired: boolean; daysLeft: number } | null>(null);
-    const { setRole } = useAuth();
+    const { user, setUser } = useAuth();
     const [isOperatorMode, setIsOperatorMode] = useState(false);
 
     useEffect(() => {
         async function check() {
-            const res = await getTrialStatus();
-            setStatus(res);
+            try {
+                const res = await getTrialStatus();
+                setStatus(res);
 
-            const opOnly = await isOperatorOnly();
-            if (opOnly) {
-                setIsOperatorMode(true);
-                setRole("OPERATOR");
+                const opOnly = await isOperatorOnly();
+                if (opOnly && user && user.role !== "OPERATOR") {
+                    setIsOperatorMode(true);
+                    setUser({ ...user, role: "OPERATOR" });
+                }
+            } catch (e) {
+                console.error("Trial check failed (DB might be empty):", e);
+                // Fallback safe to allow rendering
+                setStatus({ expired: false, daysLeft: 15 });
             }
         }
         check();
-    }, [setRole]);
+    }, [user, setUser]);
 
     if (!status) return null;
 
