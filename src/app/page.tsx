@@ -58,7 +58,7 @@ export default async function Home() {
 
     entriesToday = await db.select()
       .from(parkingRecords)
-      .where(sql`${parkingRecords.entryTime} >= ${todayStart.getTime() / 1000}`);
+      .where(sql`${parkingRecords.entryTime} >= ${todayStart}`);
 
     revenueToday = entriesToday.reduce((sum: number, r: any) => sum + (r.cost || 0), 0);
 

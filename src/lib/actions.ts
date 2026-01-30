@@ -494,8 +494,8 @@ export async function getReportData(startDateStr: string | Date, endDateStr: str
 
   const records = await db.select().from(parkingRecords)
     .where(and(
-      sql`${parkingRecords.entryTime} <= ${end.getTime() / 1000}`,
-      sql`${parkingRecords.entryTime} >= ${start.getTime() / 1000}`
+      sql`${parkingRecords.entryTime} <= ${end}`,
+      sql`${parkingRecords.entryTime} >= ${start}`
     ));
 
   console.log(`[Report] Range: ${start.toLocaleString()} to ${end.toLocaleString()} | Records found: ${records.length}`);
