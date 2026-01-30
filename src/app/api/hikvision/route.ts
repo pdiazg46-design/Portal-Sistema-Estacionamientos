@@ -17,16 +17,34 @@ import { cameras, accesses } from '@/lib/schema';
 export async function POST(request: Request) {
   try {
     const bodyText = await request.text();
+    console.log('[Hikvision] Received body:', bodyText.substring(0, 500));
+
     let payload;
     try {
       payload = JSON.parse(bodyText);
     } catch (e) {
-      console.log('[Hikvision] Raw Body (Not JSON):', bodyText);
-      // Si es XML (común en cámaras antiguas), aquí podrías ver el contenido
-      return NextResponse.json({ success: false, error: "Formato no reconocido (posiblemente XML)", raw: bodyText.substring(0, 500) }, { status: 400 });
-    }
+      // It's likely XML. Let's try to extract plate via regex if it's XML
+      console.log('[Hikvision] Body is not JSON, checking for XML patterns...');
 
-    console.log('[Hikvision] Payload received:', JSON.stringify(payload, null, 2));
+      const xmlPlate = bodyText.match(/<licensePlate>(.*?)<\/licensePlate>/) ||
+        bodyText.match(/<plateNo>(.*?)<\/plateNo>/) ||
+        bodyText.match(/<plateNumber>(.*?)<\/plateNumber>/);
+
+      if (xmlPlate && xmlPlate[1]) {
+        console.log('[Hikvision] Extracted plate from XML:', xmlPlate[1]);
+        // Mock a JSON payload for the rest of the logic
+        payload = {
+          EventNotificationAlert: {
+            ANPR: { licensePlate: xmlPlate[1] },
+            deviceName: bodyText.match(/<deviceName>(.*?)<\/deviceName>/)?.[1] || "Camara_XML"
+          }
+        };
+      } else {
+        // Just a test or heartbeat
+        console.log('[Hikvision] No plate found in XML/Text. Returning 200 for connection test.');
+        return NextResponse.json({ success: true, message: "Heartbeat/Test received" });
+      }
+    }
 
     let plateNumber = "";
     let deviceName = "";
