@@ -17,8 +17,10 @@ if (isProd) {
     // Fallback: Local SQLite (Hybrid Mode)
     console.warn("⚠️ NO POSTGRES_URL FOUND. Using Local SQLite (parking.db).");
     try {
-        const Database = require('better-sqlite3');
-        const { drizzle: drizzleSqlite } = require('drizzle-orm/better-sqlite3');
+        // Use eval("require") to prevent Webpack from trying to bundle these native modules
+        const requireFunc = eval("require");
+        const Database = requireFunc('better-sqlite3');
+        const { drizzle: drizzleSqlite } = requireFunc('drizzle-orm/better-sqlite3');
 
         const sqlite = new Database('parking.db');
         // Casting schema to any to bypass strict driver mismatch types temporarily
