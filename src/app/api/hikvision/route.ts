@@ -71,78 +71,79 @@ export async function POST(request: Request) {
     // normalizar patente
     const normalizedPlate = plateNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
-    // 4. Búsqueda en tabla de Cámaras
+    // 4. Detección de Dirección (Sense of traffic)
+    let detectedDirection: "ENTRY" | "EXIT" | null = null;
+    const rawDirection = payload.data?.eventInfo?.direction || payload.eventInfo?.direction || payload.EventNotificationAlert?.ANPR?.direction || payload.direction;
+
+    if (rawDirection) {
+      const dir = rawDirection.toString().toLowerCase();
+      if (dir.includes("approach") || dir.includes("in") || dir.includes("entrada")) detectedDirection = "ENTRY";
+      if (dir.includes("leave") || dir.includes("out") || dir.includes("salida")) detectedDirection = "EXIT";
+    }
+
+    // 5. Búsqueda en tabla de Cámaras
     const camResults = await db.select({
       camera: cameras,
       access: accesses
     })
       .from(cameras)
-      .innerJoin(accesses, eq(cameras.accessId, accesses.id))
-      .where(eq(cameras.deviceName, deviceName))
-      .get();
+      .innerJoin(accesses, eq(cameras.accessId as any, accesses.id as any))
+      .where(eq(cameras.deviceName as any, deviceName))
+      .then((res: any) => res[0]);
 
     // Variables de decisión
     let finalAccessId = camResults?.access.id;
-    let cameraType = camResults?.camera.type; // "ENTRY" o "EXIT"
+    let cameraType = camResults?.camera.type; // "ENTRY", "EXIT" o "BOTH"
 
-    // Fallback Manual basado en nombre (Solo si la cámara no está en DB)
+    // Fallback Manual basado en nombre
     if (!camResults) {
-      console.warn(`[Hikvision] Cámara '${deviceName}' no está en la base de datos de mapeo.`);
+      console.warn(`[Hikvision] Cámara '${deviceName}' no está en la base de datos.`);
       const isEntry = deviceName.toUpperCase().includes("ENTRADA") || deviceName.toUpperCase().includes("ENTRY");
       const isExit = deviceName.toUpperCase().includes("SALIDA") || deviceName.toUpperCase().includes("EXIT");
-
       if (isEntry) cameraType = "ENTRY" as any;
       if (isExit) cameraType = "EXIT" as any;
-      // Por defecto asignamos gate-a si no sabemos cuál es
       finalAccessId = "gate-a";
     }
 
-    if (cameraType === "ENTRY") {
-      console.log(`[ANPR] Detectado ingreso en ${camResults?.access.name || 'Desconocido'}: ${normalizedPlate}`);
+    // Lógica inteligente: Si es BOTH, priorizar la dirección detectada
+    let finalAction: "ENTRY" | "EXIT" | null = null;
+    if (cameraType === "BOTH") {
+      finalAction = detectedDirection;
+      if (!finalAction) {
+        return NextResponse.json({ success: false, error: "Cámara bi-direccional requiere campo direction" });
+      }
+    } else {
+      finalAction = cameraType as "ENTRY" | "EXIT";
+    }
 
+    if (finalAction === "ENTRY") {
+      console.log(`[ANPR] Detectado ingreso: ${normalizedPlate}`);
       const result = await processVehicleEntry(normalizedPlate, finalAccessId || "gate-a");
-
       if (result.allowed) {
-        return NextResponse.json({
-          success: true,
-          message: `Acceso concedido a Abonado: ${normalizedPlate} en ${camResults?.access.name}`,
-          details: result
-        });
+        return NextResponse.json({ success: true, message: `Acceso concedido Abonado: ${normalizedPlate}`, details: result });
       } else {
         const availableGeneralSpots = await getAvailableGeneralSpots(finalAccessId);
         if (availableGeneralSpots.length > 0) {
           const spot = availableGeneralSpots[0];
           await occupySpot(spot.id, normalizedPlate, "AUTOMATIC", finalAccessId);
-          return NextResponse.json({
-            success: true,
-            message: `Acceso concedido a Visita: ${normalizedPlate} en ${camResults?.access.name}. Sitio ${spot.code}`,
-            spot: spot.code
-          });
+          return NextResponse.json({ success: true, message: `Acceso concedido Visita: ${normalizedPlate}. Sitio ${spot.code}`, spot: spot.code });
         }
-
-        return NextResponse.json({
-          success: false,
-          message: `No hay sitios disponibles en ${camResults?.access.name} para: ${normalizedPlate}`,
-          details: result
-        });
+        return NextResponse.json({ success: false, message: `No hay sitios disponibles para: ${normalizedPlate}` });
       }
     }
 
-    if (cameraType === "EXIT") {
-      console.log(`[ANPR] Detectado salida en ${camResults?.access.name || 'Desconocido'}: ${normalizedPlate}`);
+    if (finalAction === "EXIT") {
+      console.log(`[ANPR] Detectado salida: ${normalizedPlate}`);
       const exitResult = await processVehicleExit(normalizedPlate, finalAccessId || "gate-a");
-      return NextResponse.json({
-        success: exitResult.success,
-        message: exitResult.message + ` (Salida por ${camResults?.access.name || 'Desconocido'})`,
-        cost: exitResult.cost
-      });
+      return NextResponse.json({ success: exitResult.success, message: exitResult.message, cost: exitResult.cost });
     }
 
     return NextResponse.json({
       success: true,
-      message: "Evento recibido pero la cámara no está configurada como ENTRY o EXIT",
+      message: "Evento recibido sin acción clara",
       plate: normalizedPlate,
-      camera: deviceName
+      camera: deviceName,
+      detectedDirection
     });
 
   } catch (error) {

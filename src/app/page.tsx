@@ -44,9 +44,9 @@ export default async function Home() {
     .limit(10)
     .all();
 
-  const enrichedSpots = spots.map(spot => {
-    const assignedStaff = staff.find(s => s.assignedSpotId === spot.id);
-    const activeRecord = activeRecords.find(r => r.spotId === spot.id);
+  const enrichedSpots = spots.map((spot: any) => {
+    const assignedStaff = staff.find((s: any) => s.assignedSpotId === spot.id);
+    const activeRecord = activeRecords.find((r: any) => r.spotId === spot.id);
 
     return {
       ...spot,
@@ -64,12 +64,12 @@ export default async function Home() {
 
   // Calculate Statistics
   const totalSpots = spots.length;
-  const occupiedSpots = spots.filter(s => s.isOccupied).length;
+  const occupiedSpots = spots.filter((s: any) => s.isOccupied).length;
   const availableSpots = totalSpots - occupiedSpots;
-  const reservedSpotsTotal = spots.filter(s => s.type === "RESERVED").length;
+  const reservedSpotsTotal = spots.filter((s: any) => s.type === "RESERVED").length;
 
   const today = new Date();
-  const staffOnVacation = staff.filter(s =>
+  const staffOnVacation = staff.filter((s: any) =>
     s.vacationStart && s.vacationEnd &&
     s.vacationStart <= today && s.vacationEnd >= today
   ).length;
@@ -87,12 +87,12 @@ export default async function Home() {
     .where(sql`${parkingRecords.entryTime} >= ${todayStart.getTime() / 1000}`)
     .all();
 
-  const revenueToday = entriesToday.reduce((sum, r) => sum + (r.cost || 0), 0);
+  const revenueToday = entriesToday.reduce((sum: any, r: any) => sum + (r.cost || 0), 0);
 
   // Projected revenue (cars currently inside - Manual only)
   const pendingRevenue = activeRecords
-    .filter(r => r.entryType === "MANUAL")
-    .reduce((sum, r) => {
+    .filter((r: any) => r.entryType === "MANUAL")
+    .reduce((sum: any, r: any) => {
       const durationMins = (new Date().getTime() - r.entryTime.getTime()) / (1000 * 60);
       const rawCost = durationMins * currentPrice;
       const rounded = Math.round(rawCost / 10) * 10;

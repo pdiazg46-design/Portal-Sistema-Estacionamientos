@@ -1,4 +1,3 @@
-
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
@@ -18,8 +17,10 @@ interface AuthContextType {
     setUser: (user: User | null) => void;
     isAdmin: boolean;
     isSuperAdmin: boolean;
+    role: Role | undefined;
     assignedAccessId: string | null;
     logout: () => void;
+    setRole: (role: Role) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const setRole = (role: Role) => {
+        if (!user) return;
+        const updatedUser = { ...user, role };
+        setUser(updatedUser);
+    };
+
     const logout = () => {
         setUser(null);
     };
@@ -57,8 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser,
             isAdmin: user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
             isSuperAdmin: user?.role === "SUPER_ADMIN",
+            role: user?.role,
             assignedAccessId: user?.accessId || null,
-            logout
+            logout,
+            setRole
         }}>
             {children}
         </AuthContext.Provider>

@@ -3,7 +3,7 @@
 
 import { db } from "./db";
 import { parkingSpots, staffMembers, parkingRecords, settings, users, accesses, cameras } from "./schema";
-import { eq, and, or, isNull, lte, gte, sql } from "drizzle-orm";
+import { eq, and, or, isNull, lte, gte, sql, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export type AccessResult = {
@@ -67,7 +67,7 @@ export async function getBranding() {
     logoUrl: "/at-sit-logo.png"
   };
 
-  allSettings.forEach(s => {
+  allSettings.forEach((s: any) => {
     if (s.key === "company_name" && s.value) branding.companyName = s.value;
     if (s.key === "system_name" && s.value) branding.systemName = s.value;
     if (s.key === "description" && s.value) branding.description = s.value;
@@ -151,36 +151,7 @@ export async function processVehicleEntry(licensePlate: string, accessId: string
   };
 }
 
-export async function getAvailableGeneralSpots(accessId?: string) {
-  const today = new Date();
 
-  // Condición base: No ocupado
-  const conditions = [eq(parkingSpots.isOccupied, false)];
-
-  // Si se especifica acceso, filtrar por él
-  if (accessId) {
-    conditions.push(eq(parkingSpots.accessId, accessId));
-  }
-
-  const allEmptySpots = await db.select().from(parkingSpots).where(and(...conditions));
-  const availableSpots = [];
-
-  for (const spot of allEmptySpots) {
-    if (spot.type === "GENERAL") {
-      availableSpots.push(spot);
-    } else if (spot.type === "RESERVED" && spot.id) {
-      // Si el sitio es reservado, solo está disponible para visitas si el dueño está de vacaciones
-      const ownerResults = await db.select().from(staffMembers).where(eq(staffMembers.assignedSpotId, spot.id));
-      const owner = ownerResults[0];
-
-      if (owner && owner.vacationStart && owner.vacationEnd &&
-        owner.vacationStart <= today && owner.vacationEnd >= today) {
-        availableSpots.push(spot);
-      }
-    }
-  }
-  return availableSpots;
-}
 
 export async function occupySpot(spotId: number, licensePlate: string, type: "AUTOMATIC" | "MANUAL", accessId?: string) {
   console.log(`[Action] Attempting occupySpot: Spot ${spotId}, Plate ${licensePlate}, Type ${type}`);
@@ -197,7 +168,7 @@ export async function occupySpot(spotId: number, licensePlate: string, type: "AU
       return { success: false, message: "El sitio ya está ocupado." };
     }
 
-    db.transaction((tx) => {
+    db.transaction((tx: any) => {
       tx.update(parkingSpots)
         .set({ isOccupied: true })
         .where(eq(parkingSpots.id, spotId))
@@ -233,7 +204,7 @@ export async function freeSpot(spotId: number) {
     exitTime: null as Date | null
   };
 
-  db.transaction((tx) => {
+  db.transaction((tx: any) => {
     // Find the active record to calculate cost
     const record = tx.select().from(parkingRecords)
       .where(and(eq(parkingRecords.spotId, spotId), isNull(parkingRecords.exitTime)))
@@ -283,7 +254,7 @@ export async function updateSpotAssignment(spotId: number, data: { name: string;
   const currentStaffResult = await db.select().from(staffMembers).where(eq(staffMembers.assignedSpotId, spotId));
   const currentStaff = currentStaffResult[0];
 
-  db.transaction((tx) => {
+  db.transaction((tx: any) => {
     if (currentStaff) {
       tx.update(staffMembers)
         .set({
@@ -311,7 +282,7 @@ export async function updateSpotAssignment(spotId: number, data: { name: string;
 }
 
 export async function removeSpotAssignment(spotId: number) {
-  db.transaction((tx) => {
+  db.transaction((tx: any) => {
     tx.update(staffMembers)
       .set({ assignedSpotId: null })
       .where(eq(staffMembers.assignedSpotId, spotId))
@@ -361,7 +332,7 @@ export async function processVehicleExit(licensePlate: string, accessId: string)
 // Stats & Simulation Actions
 
 export async function clearAllRecords() {
-  db.transaction((tx) => {
+  db.transaction((tx: any) => {
     tx.delete(parkingRecords).run();
     tx.delete(staffMembers).run();
     tx.update(parkingSpots).set({
@@ -451,7 +422,7 @@ export async function simulateOneMonthData() {
   }
 
   // Insert historical records in batches
-  db.transaction((tx) => {
+  db.transaction((tx: any) => {
     for (const record of records) {
       tx.insert(parkingRecords).values(record).run();
     }
@@ -462,9 +433,9 @@ export async function simulateOneMonthData() {
   const currentRecords: (typeof parkingRecords.$inferInsert)[] = [];
   const spotsToOccupy = spots.filter(() => Math.random() > 0.7); // 30% occupancy
 
-  db.transaction((tx) => {
+  db.transaction((tx: any) => {
     for (const spot of spotsToOccupy) {
-      const isStaff = Math.random() > 0.4 && staff.some(s => s.assignedSpotId === spot.id);
+      const isStaff = Math.random() > 0.4 && staff.some((s: any) => s.assignedSpotId === spot.id);
       let licensePlate = "";
       let entryType: "AUTOMATIC" | "MANUAL" = "MANUAL";
 
@@ -472,7 +443,7 @@ export async function simulateOneMonthData() {
       entryTime.setHours(entryTime.getHours() - Math.floor(Math.random() * 5)); // Entered 0-5 hours ago
 
       if (isStaff) {
-        const staffMember = staff.find(s => s.assignedSpotId === spot.id);
+        const staffMember = staff.find((s: any) => s.assignedSpotId === spot.id);
         licensePlate = staffMember?.licensePlate || "STF-999";
         entryType = "AUTOMATIC";
       } else {
@@ -526,7 +497,7 @@ export async function getReportData(startDateStr: string | Date, endDateStr: str
 
   console.log(`[Report] Range: ${start.toLocaleString()} to ${end.toLocaleString()} | Records found: ${records.length}`);
 
-  const timeRevenue = records.reduce((sum, r) => sum + (r.cost || 0), 0);
+  const timeRevenue = records.reduce((sum: any, r: any) => sum + (r.cost || 0), 0);
 
   // Calculate Subscription Revenue (Abonados) - ONLY count spots with an active assignment
   const subscribedSpots = await db.select({
@@ -536,7 +507,7 @@ export async function getReportData(startDateStr: string | Date, endDateStr: str
     .innerJoin(staffMembers, eq(staffMembers.assignedSpotId, parkingSpots.id))
     .all();
 
-  const monthlySubscriptionTotal = subscribedSpots.reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
+  const monthlySubscriptionTotal = subscribedSpots.reduce((sum: any, s: any) => sum + (s.monthlyFee || 0), 0);
 
   // Precise calculation: (Days in range / 30) * monthly fee
   const diffTime = Math.abs(end.getTime() - start.getTime());
@@ -550,13 +521,13 @@ export async function getReportData(startDateStr: string | Date, endDateStr: str
 
   const totalRevenue = timeRevenue + subscriptionRevenue;
   const totalEntries = records.length;
-  const manualEntries = records.filter(r => r.entryType === "MANUAL").length;
-  const subscriberEntries = records.filter(r => r.entryType === "AUTOMATIC").length;
+  const manualEntries = records.filter((r: any) => r.entryType === "MANUAL").length;
+  const subscriberEntries = records.filter((r: any) => r.entryType === "AUTOMATIC").length;
 
   const allSpots = await db.select().from(parkingSpots).all();
 
   // Detailed lists for "Control Cruzado"
-  const visitsList = records.filter(r => r.entryType === "MANUAL").map(r => ({
+  const visitsList = records.filter((r: any) => r.entryType === "MANUAL").map((r: any) => ({
     licensePlate: r.licensePlate,
     entryTime: r.entryTime,
     exitTime: r.exitTime,
@@ -586,7 +557,7 @@ export async function getReportData(startDateStr: string | Date, endDateStr: str
   let totalDurationSeconds = 0;
   let exitCount = 0;
 
-  records.forEach(r => {
+  records.forEach((r: any) => {
     // Group by local date YYYY-MM-DD
     const d = r.entryTime;
     const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -632,12 +603,39 @@ export async function getReportData(startDateStr: string | Date, endDateStr: str
   };
 }
 
+export async function getAvailableGeneralSpots(accessId?: string) {
+  let query = db.select()
+    .from(parkingSpots)
+    .where(and(
+      eq(parkingSpots.type, "GENERAL"),
+      eq(parkingSpots.isOccupied, false)
+    ));
+
+  if (accessId && accessId !== "ALL" && accessId !== "gate-a") { // Logic tweak: gate-a usually sees all or filtered? Assuming strict filter
+    // However, if accessId is provided, we filter.
+    query = db.select()
+      .from(parkingSpots)
+      .where(and(
+        eq(parkingSpots.type, "GENERAL"),
+        eq(parkingSpots.isOccupied, false),
+        eq(parkingSpots.accessId, accessId)
+      ));
+  }
+
+  // NEW: Enforce Sequential Assignment (Low -> High)
+  // We sort by ID to ensure stability, or Code if alphanumeric logic is preferred. 
+  // Using ID is usually safest for "filling up" if IDs are sequential.
+  // If codes are "A1", "A2", etc., code sorting is better.
+  // Let's us ID for now as it maps to insertion order usually.
+  return await query.orderBy(asc(parkingSpots.id));
+}
+
 export async function getSpotCounts(towerId: string = "T1") {
   const allSpots = await db.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId)).all();
   return {
     total: allSpots.length,
-    general: allSpots.filter(s => s.type === "GENERAL").length,
-    reserved: allSpots.filter(s => s.type === "RESERVED").length,
+    general: allSpots.filter((s: any) => s.type === "GENERAL").length,
+    reserved: allSpots.filter((s: any) => s.type === "RESERVED").length,
     towerId
   };
 }
@@ -646,7 +644,7 @@ export async function updateSpotCounts(totalCount: number, towerId: string = "T1
   const allSpots = await db.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId)).all();
   const currentCount = allSpots.length;
 
-  db.transaction((tx) => {
+  db.transaction((tx: any) => {
     if (totalCount > currentCount) {
       // Add new spots as General by default
       for (let i = currentCount + 1; i <= totalCount; i++) {
@@ -671,8 +669,8 @@ export async function updateSpotCounts(totalCount: number, towerId: string = "T1
 
     // FINAL STEP: Sequential Renumbering (The "Fixed Asset" logic)
     // Ensures codes are always T1-01, T1-02... Regardless of history
-    const finalSpots = tx.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId)).all().sort((a, b) => a.id - b.id);
-    finalSpots.forEach((spot, idx) => {
+    const finalSpots = tx.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId)).all().sort((a: any, b: any) => a.id - b.id);
+    finalSpots.forEach((spot: any, idx: any) => {
       tx.update(parkingSpots)
         .set({ code: `${towerId}-${(idx + 1).toString().padStart(2, '0')}` })
         .where(eq(parkingSpots.id, spot.id))
@@ -689,7 +687,7 @@ export async function toggleSpotType(spotId: number) {
 
   const nextType = spot.type === "GENERAL" ? "RESERVED" : "GENERAL";
 
-  db.transaction((tx) => {
+  db.transaction((tx: any) => {
     tx.update(parkingSpots)
       .set({ type: nextType })
       .where(eq(parkingSpots.id, spotId))
