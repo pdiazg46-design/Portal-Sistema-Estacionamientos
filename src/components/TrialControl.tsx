@@ -32,7 +32,9 @@ export default function TrialControl({ children }: { children: React.ReactNode }
 
     if (!status) return null;
 
-    if (status.expired) {
+    const isAdmin = user && (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN");
+
+    if (status.expired && !isAdmin) {
         return (
             <div style={{
                 position: "fixed",
@@ -62,7 +64,7 @@ export default function TrialControl({ children }: { children: React.ReactNode }
 
     return (
         <>
-            {status.daysLeft <= 3 && (
+            {status.daysLeft <= 3 && !isAdmin && (
                 <div style={{
                     position: "fixed",
                     top: "20px",
