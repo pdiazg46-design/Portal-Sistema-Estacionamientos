@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { processVehicleEntry, processVehicleExit, occupySpot, getAvailableGeneralSpots, normalizePlate } from '@/lib/actions';
+import { processVehicleEntry, processVehicleExit, occupySpot, getAvailableGeneralSpots } from '@/lib/actions';
+import { normalizePlate } from '@/lib/utils';
 import { db } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { cameras, accesses } from '@/lib/schema';
