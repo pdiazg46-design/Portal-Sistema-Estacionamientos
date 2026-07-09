@@ -5,7 +5,6 @@ import { useAuth } from "@/lib/AuthContext";
 import ChargingToggle from "./ChargingToggle";
 import PriceInput from "./PriceInput";
 import AdminTools from "./AdminTools";
-import BrandingTool from "./BrandingTool";
 
 interface HeaderActionsProps {
     chargingEnabled: boolean;
@@ -14,7 +13,7 @@ interface HeaderActionsProps {
 }
 
 export default function HeaderActions({ chargingEnabled, currentPrice, branding }: HeaderActionsProps) {
-    const { isAdmin } = useAuth();
+    const { isAdmin, isSuperAdmin } = useAuth();
 
     const styles = {
         badge: (enabled: boolean) => ({
@@ -47,18 +46,17 @@ export default function HeaderActions({ chargingEnabled, currentPrice, branding 
             <div style={{ display: "flex", alignItems: "center", gap: "15px", flexWrap: "wrap" }}>
                 <div style={styles.badge(chargingEnabled)}>
                     <span>{chargingEnabled ? "⚡ Sistema de Cobro ACTIVO" : "🛡️ Modo Gestión Gratuita"}</span>
-                    {isAdmin && <ChargingToggle enabled={chargingEnabled} />}
+                    {isSuperAdmin && <ChargingToggle enabled={chargingEnabled} />}
                     {chargingEnabled && (
                         <div style={styles.priceInfo}>
                             <span>Tarifa:</span>
-                            {isAdmin ? <PriceInput initialPrice={currentPrice} /> : <span style={{ fontWeight: 800 }}>${currentPrice}</span>}
+                            {isSuperAdmin ? <PriceInput initialPrice={currentPrice} /> : <span style={{ fontWeight: 800 }}>${currentPrice}</span>}
                             <span>/ min</span>
                         </div>
                     )}
                 </div>
-                {isAdmin && <AdminTools />}
+                {isAdmin && <AdminTools branding={branding} />}
             </div>
-            {isAdmin && <BrandingTool branding={branding} />}
         </div>
     );
 }

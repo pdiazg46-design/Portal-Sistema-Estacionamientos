@@ -1,7 +1,7 @@
-﻿
+
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { processVehicleEntry, processVehicleExit, AccessResult, occupySpot, freeSpot, updateSpotAssignment, removeSpotAssignment } from "@/lib/actions";
 import { useRouter as useNextRouter } from "next/navigation";
 import ReservationModal from "@/components/ReservationModal";
@@ -47,15 +47,28 @@ export default function ParkingGrid({
     recentActivity,
     chargingEnabled,
     todayStats,
-    gates
+    gates,
+    systemSettings
 }: {
     initialSpots: Spot[],
     recentActivity: Activity[],
     chargingEnabled: boolean,
     todayStats: { revenue: number, pending: number, count: number },
-    gates: Gate[]
+    gates: Gate[],
+    systemSettings?: {
+        companyName: string;
+        systemName: string;
+        description: string;
+        logoUrl: string;
+        releaseReservedSpots?: string;
+        releaseReservedTime?: string;
+    }
 }) {
     const [spots, setSpots] = useState(initialSpots);
+
+    useEffect(() => {
+        setSpots(initialSpots);
+    }, [initialSpots]);
 
     // Entry Simulation State
     const [plateInput, setPlateInput] = useState("");
@@ -82,7 +95,7 @@ export default function ParkingGrid({
     const [adminEditingSpot, setAdminEditingSpot] = useState<Spot | null>(null);
 
     const { isAdmin, assignedAccessId, isSuperAdmin } = useAuth();
-    const [selectedAccessId, setSelectedAccessId] = useState<string | "ALL">(assignedAccessId || "ALL");
+    const [selectedTowerId, setSelectedTowerId] = useState<string>("ALL");
 
     const router = useNextRouter();
 
@@ -91,12 +104,14 @@ export default function ParkingGrid({
         setLoading(true);
         setMessage("Procesando...");
         try {
-            const actualAccessId = selectedAccessId === "ALL" ? (assignedAccessId || "gate-a") : selectedAccessId;
+            const defaultGateId = gates && gates.length > 0 ? gates[0].id : "gate-1";
+            const actualAccessId = assignedAccessId || defaultGateId;
             const result: AccessResult = await processVehicleEntry(plateInput, actualAccessId);
             if (result.allowed && result.entryType === "AUTOMATIC" && result.spot) {
                 setMessage(result.message);
                 updateSpotStatus(result.spot.id, true, plateInput);
-                window.location.reload();
+                setPlateInput("");
+                router.refresh();
             } else {
                 setMessage(result.message);
             }
@@ -112,7 +127,8 @@ export default function ParkingGrid({
         setLoading(true);
         setExitMessage("Procesando Salida...");
         try {
-            const actualAccessId = selectedAccessId === "ALL" ? (assignedAccessId || "gate-a") : selectedAccessId;
+            const defaultGateId = gates && gates.length > 0 ? gates[0].id : "gate-1";
+            const actualAccessId = assignedAccessId || defaultGateId;
             const result = await processVehicleExit(exitPlateInput, actualAccessId);
             if (result.success) {
                 let summaryMsg = "";
@@ -129,7 +145,8 @@ export default function ParkingGrid({
                 }
 
                 setExitMessage(result.message + summaryMsg);
-                setTimeout(() => window.location.reload(), 2000);
+                setExitPlateInput("");
+                setTimeout(() => router.refresh(), 2000);
             } else {
                 setExitMessage(result.message);
             }
@@ -188,7 +205,7 @@ export default function ParkingGrid({
 
         try {
             await updateSpotAssignment(editingSpot.id, data);
-            window.location.reload();
+            router.refresh();
         } catch (e) {
             console.error(e);
             alert("Error actualizando reserva.");
@@ -201,7 +218,7 @@ export default function ParkingGrid({
         if (!editingSpot) return;
         try {
             await removeSpotAssignment(editingSpot.id);
-            window.location.reload();
+            router.refresh();
         } catch (e) {
             console.error(e);
             alert("Error eliminando asignación");
@@ -215,7 +232,8 @@ export default function ParkingGrid({
         try {
             await occupySpot(editingSpot.id, plate, "MANUAL");
             updateSpotStatus(editingSpot.id, true, plate);
-            window.location.reload();
+            setPlateInput("");
+            router.refresh();
         } catch (e) {
             console.error(e);
             alert("Error asignando visita");
@@ -230,7 +248,8 @@ export default function ParkingGrid({
         try {
             await occupySpot(assignmentSpot.id, finalPlate, "MANUAL");
             updateSpotStatus(assignmentSpot.id, true, finalPlate);
-            window.location.reload();
+            setPlateInput("");
+            router.refresh();
         } catch (e) {
             console.error(e);
             alert("Error asignando sitio general");
@@ -248,13 +267,40 @@ export default function ParkingGrid({
         } : s));
     }
 
-    // filtering logic
-    const gateFilteredSpots = selectedAccessId === "ALL"
-        ? spots
-        : spots.filter(s => s.accessId === selectedAccessId);
+    const isExclusivityReleased = () => {
+        if (!systemSettings || systemSettings.releaseReservedSpots !== "true") return false;
+        const releaseTime = systemSettings.releaseReservedTime || "20:00";
+        const [hours, minutes] = releaseTime.split(":").map(Number);
+        
+        const now = new Date();
+        const currentHours = now.getHours();
+        const currentMinutes = now.getMinutes();
+        
+        const nowMins = currentHours * 60 + currentMinutes;
+        const releaseMins = hours * 60 + minutes;
+        
+        return nowMins >= releaseMins;
+    };
 
-    const filteredSpots = gateFilteredSpots.filter(s => {
-        if (filter === "FREE") return !s.isOccupied;
+    const isReleased = isExclusivityReleased();
+
+    const isSpotFree = (s: Spot) => {
+        if (isReleased) {
+            return !s.isOccupied;
+        } else {
+            return !s.isOccupied && s.type !== "RESERVED";
+        }
+    };
+
+    // filtering logic
+    const uniqueTowers = Array.from(new Set(spots.map(s => s.towerId))).filter(Boolean) as string[];
+
+    const towerFilteredSpots = selectedTowerId === "ALL"
+        ? spots
+        : spots.filter(s => s.towerId === selectedTowerId);
+
+    const filteredSpots = towerFilteredSpots.filter(s => {
+        if (filter === "FREE") return isSpotFree(s);
         if (filter === "OCCUPIED") return s.isOccupied;
         if (filter === "RESERVED") return s.type === "RESERVED";
         return true;
@@ -312,7 +358,7 @@ export default function ParkingGrid({
         }),
         grid: {
             display: "grid",
-            gridTemplateColumns: "repeat(10, 1fr)",
+            gridTemplateColumns: "repeat(auto-fill, minmax(115px, 1fr))",
             gap: "10px",
             background: "#f8fafc",
             padding: "20px",
@@ -379,15 +425,15 @@ export default function ParkingGrid({
         <div style={styles.mainContainer}>
 
             {/* Left Column: Grid and Legend */}
-            <div>
+            <div style={{ minWidth: 0 }}>
                 <div style={{ ...styles.controlPanel, marginBottom: "20px" }}>
                     <div style={{ ...styles.panelTitle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                             <span>🗺️</span> Layout de Estacionamientos
                             {isAdmin && (
                                 <select
-                                    value={selectedAccessId}
-                                    onChange={(e) => setSelectedAccessId(e.target.value)}
+                                    value={selectedTowerId}
+                                    onChange={(e) => setSelectedTowerId(e.target.value)}
                                     style={{
                                         marginLeft: "15px",
                                         padding: "4px 8px",
@@ -398,9 +444,11 @@ export default function ParkingGrid({
                                         color: "var(--primary)"
                                     }}
                                 >
-                                    {isSuperAdmin && <option value="ALL">TODOS LOS ACCESOS</option>}
-                                    {gates.map(g => (
-                                        <option key={g.id} value={g.id}>{g.name.toUpperCase()}</option>
+                                    {isSuperAdmin && <option value="ALL">TODOS LOS SECTORES</option>}
+                                    {uniqueTowers.map(t => (
+                                        <option key={t} value={t}>
+                                            {t === "T1" ? "TORRE 1" : t === "T2" ? "TORRE 2" : t === "T3" ? "TORRE 3" : t.toUpperCase()}
+                                        </option>
                                     ))}
                                 </select>
                             )}
@@ -430,93 +478,154 @@ export default function ParkingGrid({
 
                     {/* Filter Bar */}
                     <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
-                        <FilterButton label="Todos" active={filter === "ALL"} onClick={() => setFilter("ALL")} count={gateFilteredSpots.length} />
-                        <FilterButton label="Libres" active={filter === "FREE"} onClick={() => setFilter("FREE")} count={gateFilteredSpots.filter(s => !s.isOccupied).length} />
-                        <FilterButton label="Ocupados" active={filter === "OCCUPIED"} onClick={() => setFilter("OCCUPIED")} count={gateFilteredSpots.filter(s => s.isOccupied).length} />
-                        <FilterButton label="Reservados" active={filter === "RESERVED"} onClick={() => setFilter("RESERVED")} count={gateFilteredSpots.filter(s => s.type === "RESERVED").length} />
+                        <FilterButton label="Todos" active={filter === "ALL"} onClick={() => setFilter("ALL")} count={towerFilteredSpots.length} />
+                        <FilterButton label="Libres" active={filter === "FREE"} onClick={() => setFilter("FREE")} count={towerFilteredSpots.filter(isSpotFree).length} />
+                        <FilterButton label="Ocupados" active={filter === "OCCUPIED"} onClick={() => setFilter("OCCUPIED")} count={towerFilteredSpots.filter(s => s.isOccupied).length} />
+                        <FilterButton label="Reservados" active={filter === "RESERVED"} onClick={() => setFilter("RESERVED")} count={towerFilteredSpots.filter(s => s.type === "RESERVED").length} />
                     </div>
 
-                    <div style={styles.grid}>
-                        {filteredSpots.map((spot) => (
-                            <div
-                                key={spot.id}
-                                style={styles.spot(spot.isOccupied, spot.type)}
-                                className="spot-card"
-                                onClick={() => handleSpotClick(spot)}
-                                title={spot.type === "RESERVED" ? "Click para editar reserva o liberar" : "Click para asignar visita"}
-                            >
-                                <div style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    height: "6px",
-                                    background: spot.type === "RESERVED" ? "#0ea5e9" : "#22c55e",
-                                    borderRadius: "10px 10px 0 0"
-                                }} />
+                    {/* Grid of Spots grouped by Level */}
+                    {(() => {
+                        // Unique levels in the selected gate/tower
+                        const levelsInTower = Array.from(new Set(towerFilteredSpots.map(s => s.level || "-1"))).sort((a, b) => {
+                            const numA = parseInt(a);
+                            const numB = parseInt(b);
+                            if (!isNaN(numA) && !isNaN(numB)) {
+                                return numB - numA; // Descending (e.g. -1 first, then -2, then -3)
+                            }
+                            return a.localeCompare(b);
+                        });
 
-                                <div style={{ position: "absolute", top: "10px", left: "8px", opacity: 0.5, fontSize: "10px" }}>
-                                    {spot.type === "RESERVED" ? "R" : "G"}
-                                </div>
+                        return levelsInTower.map((lvl) => {
+                            const allSpotsInLevel = towerFilteredSpots.filter(s => (s.level || "-1") === lvl);
+                            const spotsInLevel = filteredSpots.filter(s => (s.level || "-1") === lvl);
+                            if (spotsInLevel.length === 0) return null;
 
-                                <span style={{ fontSize: "18px", fontWeight: "900", marginBottom: "4px", marginTop: "8px" }}>{spot.code}</span>
+                            const total = allSpotsInLevel.length;
+                            const libres = allSpotsInLevel.filter(isSpotFree).length;
+                            const ocupados = allSpotsInLevel.filter(s => s.isOccupied).length;
+                            const reservados = allSpotsInLevel.filter(s => s.type === "RESERVED").length;
 
-                                {spot.isOccupied ? (
-                                    <>
-                                        <div style={{
-                                            background: "#ef4444",
-                                            color: "white",
-                                            padding: "2px 6px",
-                                            borderRadius: "4px",
-                                            fontSize: "11px",
-                                            fontWeight: "800"
-                                        }}>
-                                            {spot.currentPlate || "???"}
-                                        </div>
+                            return (
+                                <div key={lvl} style={{ marginBottom: "25px" }}>
+                                    <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                        <span style={{ color: "#475569" }}>📍 Nivel {lvl}</span>
+                                        <span style={{ fontSize: "11px", fontWeight: "700", background: "#e2e8f0", color: "#475569", padding: "2px 8px", borderRadius: "12px" }}>
+                                            {total} total
+                                        </span>
+                                        <span style={{ fontSize: "11px", fontWeight: "700", background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: "12px" }}>
+                                            {libres} libres
+                                        </span>
+                                        <span style={{ fontSize: "11px", fontWeight: "700", background: "#fee2e2", color: "#b91c1c", padding: "2px 8px", borderRadius: "12px" }}>
+                                            {ocupados} ocupados
+                                        </span>
+                                        <span style={{ fontSize: "11px", fontWeight: "700", background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: "12px" }}>
+                                            {reservados} reservados
+                                        </span>
+                                    </h3>
+                                    <div style={styles.grid}>
+                                        {spotsInLevel.map((spot) => {
+                                            const parts = spot.code.split('-');
+                                            const numberSuffix = parts[parts.length - 1];
+                                            const prefix = parts.slice(0, -1).join('-');
 
-                                        <div style={{
-                                            fontSize: "9px",
-                                            marginTop: "4px",
-                                            fontWeight: "800",
-                                            color: "#991b1b",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "3px"
-                                        }}>
-                                            ⏱️ {spot.entryTime ? formatTimeElapsed(spot.entryTime) : "???"}
-                                        </div>
+                                            return (
+                                                <div
+                                                    key={spot.id}
+                                                    style={styles.spot(spot.isOccupied, spot.type)}
+                                                    className="spot-card"
+                                                    onClick={() => handleSpotClick(spot)}
+                                                    title={spot.type === "RESERVED" ? "Click para editar reserva o liberar" : "Click para asignar visita"}
+                                                >
+                                                    <div style={{
+                                                        position: "absolute",
+                                                        top: 0,
+                                                        left: 0,
+                                                        right: 0,
+                                                        height: "6px",
+                                                        background: spot.type === "RESERVED" ? "#0ea5e9" : "#22c55e",
+                                                        borderRadius: "10px 10px 0 0"
+                                                    }} />
 
-                                        {spot.type === "RESERVED" && spot.ownerName && (
-                                            <span style={{ fontSize: "10px", marginTop: "4px", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
-                                                {spot.ownerName.split(' ')[0]}
-                                            </span>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                                        {spot.type === "RESERVED" ? (
-                                            <>
-                                                <span style={{ fontSize: "10px", opacity: 0.7 }}>{spot.ownerName ? spot.ownerPlate : "LIBRE"}</span>
-                                                {spot.vacationStart && spot.vacationEnd && (
-                                                    (() => {
-                                                        const now = new Date();
-                                                        const start = new Date(spot.vacationStart);
-                                                        const end = new Date(spot.vacationEnd);
-                                                        if (now >= start && now <= end) {
-                                                            return <span style={{ fontSize: "8px", background: "#f97316", color: "white", padding: "1px 4px", borderRadius: "3px", marginTop: "2px" }}>VACACIONES</span>;
-                                                        }
-                                                        return null;
-                                                    })()
+                                                    <div style={{ position: "absolute", top: "10px", left: "8px", opacity: 0.6, fontSize: "10px" }}>
+                                                        {spot.type === "RESERVED" ? "R" : "G"}
+                                                    </div>
+
+                                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", marginTop: "12px", marginBottom: "2px" }}>
+                                                        {prefix && (
+                                                            <div style={{ fontSize: "8px", opacity: 0.9, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", color: "#475569" }}>
+                                                                {prefix}
+                                                            </div>
+                                                        )}
+                                                        <span style={{ fontSize: "22px", fontWeight: "900", color: "#1e293b", lineHeight: "1" }}>
+                                                            {numberSuffix}
+                                                        </span>
+                                                    </div>
+
+                                                {spot.isOccupied ? (
+                                                    <>
+                                                        <div style={{
+                                                            background: "#ef4444",
+                                                            color: "white",
+                                                            padding: "2px 6px",
+                                                            borderRadius: "4px",
+                                                            fontSize: "11px",
+                                                            fontWeight: "800"
+                                                        }}>
+                                                            {spot.currentPlate || "???"}
+                                                        </div>
+
+                                                        <div style={{
+                                                            fontSize: "9px",
+                                                            marginTop: "4px",
+                                                            fontWeight: "800",
+                                                            color: "#991b1b",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: "3px"
+                                                        }}>
+                                                            ⏱️ {spot.entryTime ? formatTimeElapsed(spot.entryTime) : "???"}
+                                                        </div>
+
+                                                        {spot.type === "RESERVED" && spot.ownerName && (
+                                                            <span style={{ fontSize: "10px", marginTop: "4px", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                                                                {spot.ownerName.split(' ')[0]}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                                                        {spot.type === "RESERVED" ? (
+                                                            <>
+                                                                <span style={{ fontSize: "10px", opacity: 0.9, color: "#334155", fontWeight: "700" }}>{spot.ownerName ? spot.ownerPlate : "LIBRE"}</span>
+                                                                {isReleased && (
+                                                                    <span style={{ fontSize: "8px", background: "#22c55e", color: "white", padding: "1px 4px", borderRadius: "3px", marginTop: "2px", fontWeight: "800" }}>LIBERADO</span>
+                                                                )}
+                                                                {spot.vacationStart && spot.vacationEnd && (
+                                                                    (() => {
+                                                                        const now = new Date();
+                                                                        const start = new Date(spot.vacationStart);
+                                                                        const end = new Date(spot.vacationEnd);
+                                                                        if (now >= start && now <= end) {
+                                                                            return <span style={{ fontSize: "8px", background: "#f97316", color: "white", padding: "1px 4px", borderRadius: "3px", marginTop: "2px" }}>VACACIONES</span>;
+                                                                        }
+                                                                        return null;
+                                                                    })()
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                             <span style={{ fontSize: "10px", opacity: 0.9, fontWeight: "700", color: "#475569" }}>Disponible</span>
+                                                        )}
+                                                    </div>
                                                 )}
-                                            </>
-                                        ) : (
-                                            <span style={{ fontSize: "10px", opacity: 0.5, fontWeight: "500" }}>Disponible</span>
-                                        )}
+                                            </div>
+                                            );
+                                        })}
                                     </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
+                                </div>
+                            );
+                        });
+                    })()}
 
                     {/* Legend */}
                     <div style={{ display: "flex", gap: "20px", marginTop: "20px", padding: "10px", borderTop: "1px solid #f1f5f9" }}>
@@ -745,7 +854,7 @@ export default function ParkingGrid({
                         setReleasingSpot(null);
                         if (hasMovement) {
                             setHasMovement(false);
-                            window.location.reload();
+                            router.refresh();
                         }
                     }}
                     onRelease={handleRelease}
@@ -774,7 +883,9 @@ export default function ParkingGrid({
                     initialResult={{
                         cost: activityDetail.cost || 0,
                         durationInSeconds: activityDetail.exitTime ? (new Date(activityDetail.exitTime).getTime() - new Date(activityDetail.entryTime).getTime()) / 1000 : 0,
-                        isHistory: true
+                        isHistory: true,
+                        entryTime: activityDetail.entryTime,
+                        exitTime: activityDetail.exitTime
                     }}
                 />
             )}
@@ -828,34 +939,50 @@ export default function ParkingGrid({
                             padding: "30px",
                             borderRadius: "20px",
                             display: "grid",
-                            gridTemplateColumns: "repeat(10, 1fr)", // Force 10 columns for better overview
+                            gridTemplateColumns: "repeat(auto-fill, minmax(105px, 1fr))",
                             gap: "10px"
                         }}>
-                            {spots.map((spot) => (
-                                <div
-                                    key={spot.id}
-                                    style={{
-                                        ...styles.spot(spot.isOccupied, spot.type),
-                                        height: "80px", // Fix height for grid consistency
-                                        maxWidth: "none"
-                                    }}
-                                    onClick={() => {
-                                        handleSpotClick(spot);
-                                    }}
-                                >
-                                    <div style={{ position: "absolute", top: "5px", left: "8px", opacity: 0.5, fontSize: "10px" }}>
-                                        {spot.type === "RESERVED" ? "R" : "G"}
+                            {spots.map((spot) => {
+                                const parts = spot.code.split('-');
+                                const numberSuffix = parts[parts.length - 1];
+                                const prefix = parts.slice(0, -1).join('-');
+
+                                return (
+                                    <div
+                                        key={spot.id}
+                                        style={{
+                                            ...styles.spot(spot.isOccupied, spot.type),
+                                            height: "80px", // Fix height for grid consistency
+                                            maxWidth: "none"
+                                        }}
+                                        onClick={() => {
+                                            handleSpotClick(spot);
+                                        }}
+                                    >
+                                        <div style={{ position: "absolute", top: "5px", left: "8px", opacity: 0.5, fontSize: "10px" }}>
+                                            {spot.type === "RESERVED" ? "R" : "G"}
+                                        </div>
+                                        <div style={{ position: "absolute", top: "5px", right: "8px", opacity: 0.9, fontSize: "9px", fontWeight: "800", color: "#334155" }}>
+                                            N{spot.level || "-1"}
+                                        </div>
+                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", marginTop: "6px" }}>
+                                            {prefix && (
+                                                <div style={{ fontSize: "7px", opacity: 0.9, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", color: "#475569", marginBottom: "1px" }}>
+                                                    {prefix}
+                                                </div>
+                                            )}
+                                            <span style={{ fontSize: "20px", fontWeight: "900", color: "#1e293b", lineHeight: "1" }}>
+                                                {numberSuffix}
+                                            </span>
+                                            {spot.isOccupied && (
+                                                <div style={{ fontSize: "8px", fontWeight: "800", color: "#991b1b", marginTop: "1px" }}>
+                                                    {spot.entryTime ? formatTimeElapsed(spot.entryTime) : ""}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                                        <span style={{ fontSize: "20px", fontWeight: "900" }}>{spot.code}</span>
-                                        {spot.isOccupied && (
-                                            <div style={{ fontSize: "9px", fontWeight: "800", color: "#991b1b" }}>
-                                                {spot.entryTime ? formatTimeElapsed(spot.entryTime) : ""}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <div style={{ display: "flex", gap: "30px", padding: "20px", background: "rgba(255,255,255,0.1)", borderRadius: "15px" }}>
@@ -884,6 +1011,13 @@ export default function ParkingGrid({
                             setEditingSpot(adminEditingSpot);
                         } else {
                             setAssignmentSpot(adminEditingSpot);
+                        }
+                    }}
+                    onToggleType={(updatedSpot) => {
+                        setSpots(prev => prev.map(s => s.id === updatedSpot.id ? updatedSpot : s));
+                        setAdminEditingSpot(null);
+                        if (updatedSpot.type === "RESERVED") {
+                            setEditingSpot(updatedSpot);
                         }
                     }}
                 />

@@ -1,4 +1,4 @@
-﻿import { pgTable, text as pgText, integer as pgInteger, timestamp as pgTimestamp, boolean as pgBoolean, serial as pgSerial } from "drizzle-orm/pg-core";
+import { pgTable, text as pgText, integer as pgInteger, timestamp as pgTimestamp, boolean as pgBoolean, serial as pgSerial } from "drizzle-orm/pg-core";
 import { sqliteTable, text as sqliteText, integer as sqliteInteger } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
@@ -42,6 +42,7 @@ const pgParkingSpots = pgTable("parking_spots", {
   code: pgText("code").notNull(),
   accessId: pgText("access_id").references(() => accesses.id),
   towerId: pgText("tower_id").default("T1").notNull(),
+  level: pgText("level").default("-1").notNull(),
   type: pgText("type", { enum: ["RESERVED", "GENERAL"] }).notNull(),
   isOccupied: pgBoolean("is_occupied").default(false).notNull(),
   reservedForId: pgText("reserved_for_id"),
@@ -53,6 +54,7 @@ const sqliteParkingSpots = sqliteTable("parking_spots", {
   code: sqliteText("code").notNull(),
   accessId: sqliteText("access_id").references(() => accesses.id),
   towerId: sqliteText("tower_id").default("T1").notNull(),
+  level: sqliteText("level").default("-1").notNull(),
   type: sqliteText("type").notNull(),
   isOccupied: sqliteInteger("is_occupied", { mode: 'boolean' }).default(false).notNull(),
   reservedForId: sqliteText("reserved_for_id"),

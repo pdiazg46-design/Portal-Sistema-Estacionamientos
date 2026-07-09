@@ -2,7 +2,8 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { updateBranding } from "@/lib/actions";
 
 type BrandingModalProps = {
@@ -13,6 +14,8 @@ type BrandingModalProps = {
         systemName: string;
         description: string;
         logoUrl: string;
+        releaseReservedSpots?: string;
+        releaseReservedTime?: string;
     };
 };
 
@@ -20,6 +23,11 @@ export default function BrandingModal({ isOpen, onClose, initialData }: Branding
     const [formData, setFormData] = useState(initialData);
     const [loading, setLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     if (!isOpen) return null;
 
@@ -77,7 +85,9 @@ export default function BrandingModal({ isOpen, onClose, initialData }: Branding
             width: "100%",
             maxWidth: "500px",
             boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-            margin: "auto"
+            margin: "auto",
+            maxHeight: "85vh",
+            overflowY: "auto" as const
         },
         header: {
             margin: "0 0 20px 0",
@@ -146,7 +156,9 @@ export default function BrandingModal({ isOpen, onClose, initialData }: Branding
         }
     };
 
-    return (
+    if (!mounted) return null;
+
+    return createPortal(
         <div style={styles.overlay}>
             <div style={styles.modal} className="animate-fade-in">
                 <h3 style={styles.header}>Personalización de Marca</h3>
@@ -223,6 +235,40 @@ export default function BrandingModal({ isOpen, onClose, initialData }: Branding
                         />
                     </div>
 
+                    <div style={{ height: "1px", background: "#e2e8f0", margin: "20px 0" }} />
+                    <h4 style={{ fontSize: "14px", fontWeight: "800", color: "var(--primary)", marginBottom: "15px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        ⚙️ Ajustes del Sistema
+                    </h4>
+
+                    <div style={{ ...styles.group, flexDirection: "row", alignItems: "center", gap: "10px", display: "flex", marginBottom: "15px" }}>
+                        <input
+                            type="checkbox"
+                            id="releaseReservedSpots"
+                            checked={formData.releaseReservedSpots === "true"}
+                            onChange={e => setFormData({ ...formData, releaseReservedSpots: e.target.checked ? "true" : "false" })}
+                            style={{ width: "18px", height: "18px", accentColor: "var(--primary)", cursor: "pointer" }}
+                        />
+                        <label htmlFor="releaseReservedSpots" style={{ ...styles.label, marginBottom: 0, cursor: "pointer", fontWeight: "700" }}>
+                            Liberar reservados por horario
+                        </label>
+                    </div>
+
+                    {formData.releaseReservedSpots === "true" && (
+                        <div style={styles.group}>
+                            <label style={styles.label}>Hora de liberación diaria (formato 24h)</label>
+                            <input
+                                type="time"
+                                style={styles.input}
+                                value={formData.releaseReservedTime || "20:00"}
+                                onChange={e => setFormData({ ...formData, releaseReservedTime: e.target.value })}
+                                required
+                            />
+                            <span style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", fontWeight: "600", display: "block" }}>
+                                A partir de esta hora, cualquier auto general podrá ocupar estacionamientos reservados vacíos.
+                            </span>
+                        </div>
+                    )}
+
                     <div style={styles.actions}>
                         <button type="button" onClick={onClose} style={styles.btnCancel} disabled={loading}>Cancelar</button>
                         <button type="submit" style={styles.btnSave} disabled={loading}>
@@ -231,6 +277,7 @@ export default function BrandingModal({ isOpen, onClose, initialData }: Branding
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

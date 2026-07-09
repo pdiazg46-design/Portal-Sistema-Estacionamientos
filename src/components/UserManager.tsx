@@ -162,7 +162,7 @@ export default function UserManager() {
                                     value={formData.role}
                                     onChange={e => setFormData({ ...formData, role: e.target.value })}
                                 >
-                                    {isSuperAdmin && <option value="ADMIN">ADMINISTRADOR (Cliente)</option>}
+                                    {(isSuperAdmin || isAdmin) && <option value="ADMIN">ADMINISTRADOR (Cliente)</option>}
                                     <option value="OPERATOR">OPERADOR (Guardia)</option>
                                 </select>
                             </div>

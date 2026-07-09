@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { db } from "./db";
 import { parkingSpots, staffMembers, parkingRecords, settings, users, accesses, cameras } from "./schema";
@@ -77,7 +77,9 @@ export async function getBranding() {
     companyName: "Mi Estacionamiento",
     systemName: "Panel de Control de Estacionamientos",
     description: "Sistema de Gestión de Acceso Vehicular",
-    logoUrl: "/at-sit-logo.png"
+    logoUrl: "/at-sit-logo.png",
+    releaseReservedSpots: "false",
+    releaseReservedTime: "20:00"
   };
 
   try {
@@ -86,6 +88,8 @@ export async function getBranding() {
       if (s.key === "company_name" && s.value) branding.companyName = s.value;
       if (s.key === "system_name" && s.value) branding.systemName = s.value;
       if (s.key === "description" && s.value) branding.description = s.value;
+      if (s.key === "release_reserved_spots" && s.value) branding.releaseReservedSpots = s.value;
+      if (s.key === "release_reserved_time" && s.value) branding.releaseReservedTime = s.value;
       if (s.key === "logo_url" && s.value) {
         if (s.value.startsWith("/") || s.value.startsWith("http") || s.value.startsWith("data:image")) {
           branding.logoUrl = s.value;
@@ -99,12 +103,21 @@ export async function getBranding() {
   return branding;
 }
 
-export async function updateBranding(data: { companyName?: string, systemName?: string, description?: string, logoUrl?: string }) {
+export async function updateBranding(data: { 
+  companyName?: string, 
+  systemName?: string, 
+  description?: string, 
+  logoUrl?: string,
+  releaseReservedSpots?: string,
+  releaseReservedTime?: string
+}) {
   const entries = [
     { key: "company_name", value: data.companyName },
     { key: "system_name", value: data.systemName },
     { key: "description", value: data.description },
-    { key: "logo_url", value: data.logoUrl }
+    { key: "logo_url", value: data.logoUrl },
+    { key: "release_reserved_spots", value: data.releaseReservedSpots },
+    { key: "release_reserved_time", value: data.releaseReservedTime }
   ].filter(e => e.value !== undefined);
 
   for (const entry of entries) {
@@ -220,8 +233,8 @@ export async function freeSpot(spotId: number) {
     success: false,
     cost: 0,
     durationInSeconds: 0,
-    entryTime: null as Date | null,
-    exitTime: null as Date | null
+    entryTime: null as string | null,
+    exitTime: null as string | null
   };
 
   await db.transaction(async (tx: any) => {
@@ -246,8 +259,8 @@ export async function freeSpot(spotId: number) {
         success: true,
         cost,
         durationInSeconds,
-        entryTime: entryTimeObj,
-        exitTime: exitTime
+        entryTime: entryTimeObj ? entryTimeObj.toISOString() : null,
+        exitTime: exitTime ? exitTime.toISOString() : null
       };
     }
 
@@ -616,21 +629,49 @@ export async function getReportData(startDateStr: string | Date, endDateStr: str
 }
 
 export async function getAvailableGeneralSpots(accessId?: string) {
+  let releaseActive = false;
+  try {
+    const allSettings = await db.select().from(settings);
+    const releaseReservedSpots = allSettings.find((s: any) => s.key === "release_reserved_spots")?.value === "true";
+    const releaseReservedTime = allSettings.find((s: any) => s.key === "release_reserved_time")?.value || "20:00";
+    
+    if (releaseReservedSpots) {
+      const [hours, minutes] = releaseReservedTime.split(":").map(Number);
+      const now = new Date();
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+      const nowMins = currentHours * 60 + currentMinutes;
+      const releaseMins = hours * 60 + minutes;
+      if (nowMins >= releaseMins) {
+        releaseActive = true;
+      }
+    }
+  } catch (e) {
+    console.error("Error reading release settings in LPR:", e);
+  }
+
+  const typeCondition = releaseActive 
+    ? or(eq(parkingSpots.type, "GENERAL"), eq(parkingSpots.type, "RESERVED"))
+    : eq(parkingSpots.type, "GENERAL");
+
   let query = db.select()
     .from(parkingSpots)
     .where(and(
-      eq(parkingSpots.type, "GENERAL"),
+      typeCondition,
       eq(parkingSpots.isOccupied, false)
     ));
 
-  if (accessId && accessId !== "ALL" && accessId !== "gate-a") { // Logic tweak: gate-a usually sees all or filtered? Assuming strict filter
-    // However, if accessId is provided, we filter.
+  if (accessId && accessId !== "ALL") {
+    // Filter spots belonging to this access gate, OR spots with no specific gate association (accessId IS NULL)
     query = db.select()
       .from(parkingSpots)
       .where(and(
-        eq(parkingSpots.type, "GENERAL"),
+        typeCondition,
         eq(parkingSpots.isOccupied, false),
-        eq(parkingSpots.accessId, accessId)
+        or(
+          eq(parkingSpots.accessId, accessId),
+          isNull(parkingSpots.accessId)
+        )
       ));
   }
 
@@ -644,59 +685,114 @@ export async function getAvailableGeneralSpots(accessId?: string) {
 
 export async function getSpotCounts(towerId: string = "T1") {
   const allSpots = await db.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId));
+  
+  const levels = {
+    "-1": allSpots.filter((s: any) => s.level === "-1").length,
+    "-2": allSpots.filter((s: any) => s.level === "-2").length,
+    "-3": allSpots.filter((s: any) => s.level === "-3").length
+  };
+
   return {
     total: allSpots.length,
     general: allSpots.filter((s: any) => s.type === "GENERAL").length,
     reserved: allSpots.filter((s: any) => s.type === "RESERVED").length,
+    levels,
     towerId
   };
 }
 
-export async function updateSpotCounts(totalCount: number, towerId: string = "T1") {
-  const allSpots = await db.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId));
-  const currentCount = allSpots.length;
-
-  // Mapa automático de Torre a Puerta
-  const gateMapping: Record<string, string> = {
-    "T1": "gate-1",
-    "T2": "gate-2",
-    "T3": "gate-3"
-  };
-  const targetGateId = gateMapping[towerId];
+export async function updateSpotCounts(
+  levelsConfig: Record<string, number>, 
+  towerId: string = "T1",
+  gateId?: string
+) {
+  let targetGateId = gateId || null;
+  if (!targetGateId) {
+    const gateMapping: Record<string, string> = {
+      "T1": "gate-1",
+      "T2": "gate-2",
+      "T3": "gate-3"
+    };
+    targetGateId = gateMapping[towerId] || null;
+  }
 
   await db.transaction(async (tx: any) => {
-    if (totalCount > currentCount) {
-      // Add new spots as General by default
-      for (let i = currentCount + 1; i <= totalCount; i++) {
-        await tx.insert(parkingSpots).values({
-          code: `${towerId}-${i.toString().padStart(2, '0')}`,
-          towerId,
-          accessId: targetGateId, // Vincular a la puerta correspondiente
-          type: "GENERAL",
-          isOccupied: false
-        });
-      }
-    } else if (totalCount < currentCount) {
-      // Remove from the end, but only if not occupied
-      const toRemove = allSpots.slice(totalCount).reverse();
-      for (const spot of toRemove) {
-        if (!spot.isOccupied) {
-          // Unassign staff if any
-          await tx.update(staffMembers).set({ assignedSpotId: null }).where(eq(staffMembers.assignedSpotId, spot.id));
-          await tx.delete(parkingSpots).where(eq(parkingSpots.id, spot.id));
+    const allSpots = await tx.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId));
+
+    // We process all levels provided in the config
+    const levelsToProcess = Object.keys(levelsConfig);
+
+    for (const lvl of levelsToProcess) {
+      const targetCount = levelsConfig[lvl] || 0;
+      const levelSpots = allSpots.filter((s: any) => s.level === lvl);
+      const currentCount = levelSpots.length;
+
+      if (targetCount > currentCount) {
+        // Add new spots to this level
+        for (let i = currentCount + 1; i <= targetCount; i++) {
+          await tx.insert(parkingSpots).values({
+            code: `${towerId}-TEMP`, // Code will be renumbered below
+            towerId,
+            level: lvl,
+            accessId: targetGateId,
+            type: "GENERAL",
+            isOccupied: false
+          });
+        }
+      } else if (targetCount < currentCount) {
+        // Remove spots from the end of this level, but only if not occupied
+        const toRemove = levelSpots.slice(targetCount).reverse();
+        for (const spot of toRemove) {
+          if (!spot.isOccupied) {
+            // Unassign staff if any
+            await tx.update(staffMembers).set({ assignedSpotId: null }).where(eq(staffMembers.assignedSpotId, spot.id));
+            // Decouple historical parking records
+            await tx.update(parkingRecords).set({ spotId: null }).where(eq(parkingRecords.spotId, spot.id));
+            await tx.delete(parkingSpots).where(eq(parkingSpots.id, spot.id));
+          }
         }
       }
     }
 
-    // FINAL STEP: Sequential Renumbering (The "Fixed Asset" logic)
-    // Ensures codes are always T1-01, T1-02... Regardless of history
-    // UPDATED: Also ensure accessId is correctly set for all spots in this tower
-    const finalSpots = (await tx.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId))).sort((a: any, b: any) => a.id - b.id);
+    // Deleting any level in DB that is set to 0 or missing from config entirely
+    const existingLevelsInDB = Array.from(new Set(allSpots.map((s: any) => s.level || "-1")));
+    for (const lvl of existingLevelsInDB) {
+      if (!(lvl in levelsConfig)) {
+        const levelSpots = allSpots.filter((s: any) => s.level === lvl);
+        for (const spot of levelSpots) {
+          if (!spot.isOccupied) {
+            await tx.update(staffMembers).set({ assignedSpotId: null }).where(eq(staffMembers.assignedSpotId, spot.id));
+            // Decouple historical parking records
+            await tx.update(parkingRecords).set({ spotId: null }).where(eq(parkingRecords.spotId, spot.id));
+            await tx.delete(parkingSpots).where(eq(parkingSpots.id, spot.id));
+          }
+        }
+      }
+    }
+
+    // FINAL STEP: Sequential Renumbering across the entire tower!
+    const finalSpots = (await tx.select().from(parkingSpots).where(eq(parkingSpots.towerId, towerId)));
+    finalSpots.sort((a: any, b: any) => {
+      const lvlA = parseInt(a.level || "-1");
+      const lvlB = parseInt(b.level || "-1");
+      const isNumA = !isNaN(lvlA);
+      const isNumB = !isNaN(lvlB);
+      
+      if (isNumA && isNumB) {
+        if (lvlA !== lvlB) return lvlB - lvlA; // Descending (e.g. -1 first, then -2, then -3)
+      } else {
+        if (a.level !== b.level) {
+          return (a.level || "").localeCompare(b.level || "");
+        }
+      }
+      return a.id - b.id;
+    });
+
     for (const [idx, spot] of finalSpots.entries()) {
       await tx.update(parkingSpots)
         .set({
           code: `${towerId}-${(idx + 1).toString().padStart(2, '0')}`,
-          accessId: targetGateId // Corregir vinculación si era nula
+          accessId: targetGateId
         })
         .where(eq(parkingSpots.id, spot.id));
     }
@@ -734,22 +830,9 @@ export async function updateSpotMonthlyFee(spotId: number, fee: number) {
 }
 
 export async function getTrialStatus() {
-  const existing = (await db.select().from(settings).where(eq(settings.key, "install_date")))[0];
-  const now = Math.floor(Date.now() / 1000);
-
-  if (!existing) {
-    // First run, set the install date
-    await db.insert(settings).values({ key: "install_date", value: now.toString() });
-    return { expired: false, daysLeft: 15 };
-  }
-
-  const installDate = parseInt(existing.value);
-  const diffDays = Math.floor((now - installDate) / (24 * 3600));
-  const daysLeft = Math.max(0, 15 - diffDays);
-
   return {
-    expired: diffDays >= 15,
-    daysLeft
+    expired: false,
+    daysLeft: 9999
   };
 }
 
@@ -771,7 +854,7 @@ export async function loginUser(username: string, password: string) {
     })
       .from(users)
       .leftJoin(accesses, eq(users.accessId, accesses.id))
-      .where(eq(users.username, username)))[0];
+      .where(sql`LOWER(${users.username}) = LOWER(${username})`))[0];
 
     if (!result) {
       console.warn(`[Login] Usuario no encontrado: ${username}`);
@@ -846,4 +929,62 @@ export async function deleteUser(userId: string) {
     console.error("Error deleting user:", error);
     return { success: false, message: "Error al eliminar el usuario." };
   }
+}
+
+export async function getAllTowers() {
+  const spots = await db.select({
+    towerId: parkingSpots.towerId,
+    accessId: parkingSpots.accessId
+  }).from(parkingSpots);
+
+  const uniqueTowers: Record<string, string> = {};
+  for (const s of spots) {
+    if (s.towerId) {
+      uniqueTowers[s.towerId] = s.accessId || "";
+    }
+  }
+
+  // Only if the database is completely empty of towers, we initialize T1 as default
+  if (Object.keys(uniqueTowers).length === 0) {
+    uniqueTowers["T1"] = "gate-1";
+  }
+
+  return uniqueTowers;
+}
+
+export async function renameTower(oldTowerId: string, newTowerId: string) {
+  await db.transaction(async (tx: any) => {
+    // Update all parking spots towerId
+    await tx.update(parkingSpots)
+      .set({ towerId: newTowerId })
+      .where(eq(parkingSpots.towerId, oldTowerId));
+
+    const spots = await tx.select().from(parkingSpots).where(eq(parkingSpots.towerId, newTowerId));
+    
+    // Sort spots
+    spots.sort((a: any, b: any) => {
+      const lvlA = parseInt(a.level || "-1");
+      const lvlB = parseInt(b.level || "-1");
+      const isNumA = !isNaN(lvlA);
+      const isNumB = !isNaN(lvlB);
+      
+      if (isNumA && isNumB) {
+        if (lvlA !== lvlB) return lvlB - lvlA;
+      } else {
+        if (a.level !== b.level) {
+          return (a.level || "").localeCompare(b.level || "");
+        }
+      }
+      return a.id - b.id;
+    });
+
+    // Update spot codes to match the new prefix
+    for (const [idx, spot] of spots.entries()) {
+      await tx.update(parkingSpots)
+        .set({ code: `${newTowerId}-${(idx + 1).toString().padStart(2, '0')}` })
+        .where(eq(parkingSpots.id, spot.id));
+    }
+  });
+
+  safeRevalidate();
 }

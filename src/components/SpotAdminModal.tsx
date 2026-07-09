@@ -7,11 +7,13 @@ import { toggleSpotType, updateSpotMonthlyFee } from "@/lib/actions";
 export default function SpotAdminModal({
     spot,
     onClose,
-    onOpenAssignment
+    onOpenAssignment,
+    onToggleType
 }: {
     spot: any,
     onClose: () => void,
-    onOpenAssignment: () => void
+    onOpenAssignment: () => void,
+    onToggleType?: (updatedSpot: any) => void
 }) {
     const [fee, setFee] = useState(spot.monthlyFee || 0);
     const [loading, setLoading] = useState(false);
@@ -22,8 +24,16 @@ export default function SpotAdminModal({
             return;
         }
         setLoading(true);
+        const newType = spot.type === "RESERVED" ? "GENERAL" : "RESERVED";
         await toggleSpotType(spot.id);
-        window.location.reload();
+        
+        const updatedSpot = { ...spot, type: newType };
+        
+        if (onToggleType) {
+            onToggleType(updatedSpot);
+        } else {
+            window.location.reload();
+        }
     }
 
     const formatValue = (val: number | string) => {

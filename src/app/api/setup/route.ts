@@ -133,6 +133,12 @@ export async function GET() {
       ON CONFLICT (username) DO UPDATE SET role = 'SUPER_ADMIN', access_id = NULL
     `);
 
+    await db.execute(sql`
+      INSERT INTO users (id, username, password, email, role, access_id) 
+      VALUES ('sergio-init', 'Sergio', 'sergio', 'sergio@estacionamientosft.cl', 'ADMIN', NULL)
+      ON CONFLICT (username) DO UPDATE SET role = 'ADMIN', access_id = NULL
+    `);
+
     revalidatePath('/');
 
     return NextResponse.json({

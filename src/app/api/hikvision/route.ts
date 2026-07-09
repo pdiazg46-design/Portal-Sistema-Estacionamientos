@@ -113,14 +113,15 @@ export async function POST(request: Request) {
     let finalAccessId = camResults?.access.id;
     let cameraType = camResults?.camera.type; // "ENTRY", "EXIT" o "BOTH"
 
-    // Fallback Manual basado en nombre
     if (!camResults) {
       console.warn(`[Hikvision] Cámara '${deviceName}' no está en la base de datos.`);
       const isEntry = deviceName.toUpperCase().includes("ENTRADA") || deviceName.toUpperCase().includes("ENTRY");
       const isExit = deviceName.toUpperCase().includes("SALIDA") || deviceName.toUpperCase().includes("EXIT");
       if (isEntry) cameraType = "ENTRY" as any;
       if (isExit) cameraType = "EXIT" as any;
-      finalAccessId = "gate-a";
+      
+      const allAccesses = await db.select().from(accesses);
+      finalAccessId = allAccesses[0]?.id || "gate-1";
     }
 
     // Lógica inteligente: Si es BOTH, priorizar la dirección detectada
@@ -136,7 +137,7 @@ export async function POST(request: Request) {
 
     if (finalAction === "ENTRY") {
       console.log(`[ANPR] Detectado ingreso: ${normalizedPlate}`);
-      const result = await processVehicleEntry(normalizedPlate, finalAccessId || "gate-a");
+      const result = await processVehicleEntry(normalizedPlate, finalAccessId || "gate-1");
       if (result.allowed) {
         return NextResponse.json({ success: true, message: `Acceso concedido Abonado: ${normalizedPlate}`, details: result });
       } else {
@@ -152,7 +153,7 @@ export async function POST(request: Request) {
 
     if (finalAction === "EXIT") {
       console.log(`[ANPR] Detectado salida: ${normalizedPlate}`);
-      const exitResult = await processVehicleExit(normalizedPlate, finalAccessId || "gate-a");
+      const exitResult = await processVehicleExit(normalizedPlate, finalAccessId || "gate-1");
       return NextResponse.json({ success: exitResult.success, message: exitResult.message, cost: exitResult.cost });
     }
 

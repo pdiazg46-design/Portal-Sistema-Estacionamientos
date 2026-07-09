@@ -1,4 +1,4 @@
-﻿
+
 import ParkingGrid from "@/components/ParkingGrid";
 import { getPricePerMinute, isChargingEnabled, getBranding } from "@/lib/actions";
 import HeaderActions from "@/components/HeaderActions";
@@ -121,7 +121,7 @@ export default async function Home() {
     : "/at-sit-logo.png";
 
   return (
-    <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "40px 20px" }}>
+    <main style={{ maxWidth: "1750px", width: "96%", margin: "0 auto", padding: "30px 0" }}>
       <div className="animate-fade-in">
 
         {/* Header Section */}
@@ -190,6 +190,7 @@ export default async function Home() {
         chargingEnabled={chargingEnabled}
         todayStats={todayStats}
         gates={gates}
+        systemSettings={branding}
       />
 
       <UserManager />

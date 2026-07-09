@@ -12,7 +12,7 @@ export async function GET() {
         const allAccesses = await db.select().from(accesses);
         console.log(`[SetupAPI] Found ${allAccesses.length} accesses.`);
 
-        let gate1 = allAccesses.find((a: any) => a.name.toLowerCase().includes("puerta 1") || a.id === "gate-a");
+        let gate1 = allAccesses.find((a: any) => a.name.toLowerCase().includes("puerta 1") || a.id === "gate-1");
         if (!gate1) {
             // Fallback or create? 
             if (allAccesses.length > 0) {
