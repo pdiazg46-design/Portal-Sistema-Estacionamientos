@@ -228,7 +228,7 @@ export async function processVehicleEntry(licensePlate: string, accessId: string
 
 
 
-export async function occupySpot(spotId: number, licensePlate: string, type: "AUTOMATIC" | "MANUAL", accessId?: string, visitorName?: string) {
+export async function occupySpot(spotId: number, licensePlate: string, type: "AUTOMATIC" | "MANUAL", accessId?: string, visitorName?: string, entryComments?: string) {
   const normalizedPlate = normalizePlate(licensePlate);
   console.log(`[Action] Attempting occupySpot: Spot ${spotId}, Plate ${normalizedPlate}, Type ${type}`);
   try {
@@ -255,7 +255,8 @@ export async function occupySpot(spotId: number, licensePlate: string, type: "AU
         entryType: type,
         entryAccessId: accessId,
         entryTime: new Date(),
-        visitorName: visitorName || null
+        visitorName: visitorName || null,
+        entryComments: entryComments || null
       });
     });
     console.log(`[Action] Successfully occupied spot ${spotId} with plate ${normalizedPlate}`);

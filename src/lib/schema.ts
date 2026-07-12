@@ -109,6 +109,7 @@ const pgParkingRecords = pgTable("parking_records", {
   entryType: pgText("entry_type", { enum: ["AUTOMATIC", "MANUAL"] }).notNull(),
   cost: pgInteger("cost"),
   visitorName: pgText("visitor_name"),
+  entryComments: pgText("entry_comments"),
 });
 
 const sqliteParkingRecords = sqliteTable("parking_records", {
@@ -123,6 +124,7 @@ const sqliteParkingRecords = sqliteTable("parking_records", {
   entryType: sqliteText("entry_type").notNull(),
   cost: sqliteInteger("cost"),
   visitorName: sqliteText("visitor_name"),
+  entryComments: sqliteText("entry_comments"),
 });
 
 export const parkingRecords = (isPostgres ? pgParkingRecords : sqliteParkingRecords) as any;

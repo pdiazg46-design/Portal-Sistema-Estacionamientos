@@ -22,7 +22,7 @@ type ReservationModalProps = {
   }) => Promise<void>;
   onDeleteStaff: (staffId: string) => Promise<void>;
   onDeleteSpotAll: () => Promise<void>;
-  onAssignVisitor: (plate: string, visitorName?: string) => Promise<boolean>;
+  onAssignVisitor: (plate: string, visitorName?: string, entryComments?: string) => Promise<boolean>;
   onReleaseSpot: () => Promise<{ success: boolean; cost: number; durationInSeconds: number; entryTime?: Date | null; exitTime?: Date | null }>;
   onConvertToGeneral: () => Promise<void>;
   onConvertToReserved: () => Promise<void>;
@@ -90,6 +90,7 @@ export default function ReservationModal({
   // Traffic / visitor assignment states
   const [visitorPlate, setVisitorPlate] = useState(preFilledVisitorPlate || "");
   const [visitorName, setVisitorName] = useState("");
+  const [entryComments, setEntryComments] = useState("");
   const [releaseResult, setReleaseResult] = useState<any>(null);
 
   // Form states for creating/editing a staff member
@@ -276,19 +277,24 @@ export default function ReservationModal({
 
   const handleVisitorAssign = async () => {
     if (!visitorPlate) {
-      alert("Ingrese una patente para registrar ingreso.");
+      await alert("Ingrese una patente para registrar ingreso.");
+      return;
+    }
+    if (!entryComments.trim()) {
+      await alert("Debe ingresar las observaciones de este ingreso manual obligatoriamente.");
       return;
     }
     setLoading(true);
     try {
-      const success = await onAssignVisitor(visitorPlate, visitorName);
+      const success = await onAssignVisitor(visitorPlate, visitorName, entryComments);
       if (success) {
         setVisitorName("");
+        setEntryComments("");
         onClose();
       }
     } catch (e) {
       console.error(e);
-      alert("Error al registrar el ingreso de la visita.");
+      await alert("Error al registrar el ingreso de la visita.");
     } finally {
       setLoading(false);
     }
@@ -856,6 +862,15 @@ export default function ReservationModal({
                           style={styles.input}
                           value={visitorName}
                           onChange={e => setVisitorName(e.target.value)}
+                        />
+                      </div>
+                      <div style={styles.group}>
+                        <label style={styles.label}>Observaciones del Ingreso <span style={{ color: "#dc2626", fontWeight: "bold" }}>*</span></label>
+                        <textarea 
+                          placeholder="Ej: Proveedor ascensor, reparaciones, entrega de agua, etc." 
+                          style={{ ...styles.input, minHeight: "60px", padding: "8px", resize: "vertical", fontFamily: "inherit" }}
+                          value={entryComments}
+                          onChange={e => setEntryComments(e.target.value)}
                         />
                       </div>
                       <button 
