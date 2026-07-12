@@ -5,12 +5,14 @@ import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import SpotConfigModal from "./SpotConfigModal";
 import BrandingModal from "./BrandingModal";
+import BulkUploadModal from "./BulkUploadModal";
 
 export default function AdminTools({ branding }: { branding: any }) {
     const { isSuperAdmin } = useAuth();
     const [loading, setLoading] = useState(false);
     const [showSpotConfig, setShowSpotConfig] = useState(false);
     const [showBranding, setShowBranding] = useState(false);
+    const [showBulkUpload, setShowBulkUpload] = useState(false);
 
     return (
         <div style={{ display: "flex", gap: "10px" }}>
@@ -74,6 +76,27 @@ export default function AdminTools({ branding }: { branding: any }) {
                 </button>
             )}
 
+            <button
+                onClick={() => setShowBulkUpload(true)}
+                disabled={loading}
+                style={{
+                    padding: "6px 12px",
+                    background: "#10b981",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    opacity: loading ? 0.6 : 1
+                }}
+            >
+                📥 Carga Masiva
+            </button>
+
             {showSpotConfig && (
                 <SpotConfigModal onClose={() => setShowSpotConfig(false)} />
             )}
@@ -83,6 +106,13 @@ export default function AdminTools({ branding }: { branding: any }) {
                     isOpen={showBranding}
                     onClose={() => setShowBranding(false)}
                     initialData={branding}
+                />
+            )}
+
+            {showBulkUpload && (
+                <BulkUploadModal
+                    isOpen={showBulkUpload}
+                    onClose={() => setShowBulkUpload(false)}
                 />
             )}
         </div>

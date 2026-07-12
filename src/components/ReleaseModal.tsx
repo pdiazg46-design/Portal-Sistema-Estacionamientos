@@ -12,10 +12,31 @@ type ReleaseModalProps = {
         type: string;
         ownerName?: string;
         ownerPhone?: string;
+        ownerPlate?: string;
+        ownerIsAllDay?: boolean;
+        ownerWeekdays?: string;
+        ownerStartTime?: string;
+        ownerEndTime?: string;
         currentPlate?: string;
+        allOwners?: any[];
     };
     initialResult?: { cost: number; durationInSeconds: number; isHistory?: boolean; entryTime?: Date | string | null; exitTime?: Date | string | null } | null;
     chargingEnabled?: boolean;
+};
+
+const WEEKDAY_MAP: Record<string, string> = {
+  MON: "Lunes",
+  TUE: "Martes",
+  WED: "Miércoles",
+  THU: "Jueves",
+  FRI: "Viernes",
+  SAT: "Sábado",
+  SUN: "Domingo"
+};
+
+const formatWeekdaysSpanish = (weekdaysStr: string) => {
+  if (!weekdaysStr) return "Ninguno";
+  return weekdaysStr.split(",").map(day => WEEKDAY_MAP[day] || day).join(", ");
 };
 
 export default function ReleaseModal({ isOpen, onClose, onRelease, spot, initialResult, chargingEnabled }: ReleaseModalProps) {
@@ -231,14 +252,52 @@ export default function ReleaseModal({ isOpen, onClose, onRelease, spot, initial
                         <div style={styles.code}>{spot.code}</div>
 
                         <div style={styles.infoCard}>
-                            <div style={styles.infoRow}>
-                                <span style={styles.label}>Tipo de Sitio:</span>
-                                <span style={styles.value}>{spot.type === "RESERVED" ? "ABONADO" : "GENERAL"}</span>
-                            </div>
-                            {spot.type === "RESERVED" && (
+                            {spot.type === "RESERVED" ? (
+                                <>
+                                    <div style={styles.infoRow}>
+                                        <span style={styles.label}>Reserva Activa:</span>
+                                        <span style={styles.value}>
+                                            {spot.ownerName ? spot.ownerName : "Sin abonado en este tramo"}
+                                        </span>
+                                    </div>
+                                    {spot.ownerPlate && (
+                                        <div style={styles.infoRow}>
+                                            <span style={styles.label}>Patente Abonado:</span>
+                                            <span style={{ ...styles.value, fontFamily: "monospace", letterSpacing: "0.5px" }}>
+                                                {spot.ownerPlate}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {spot.ownerName && (
+                                        <div style={styles.infoRow}>
+                                            <span style={styles.label}>Tramo Activo:</span>
+                                            <span style={{ ...styles.value, fontSize: "12px", color: "var(--primary)" }}>
+                                                {spot.ownerIsAllDay ? "Todo el día" : `${spot.ownerWeekdays || ""} (${spot.ownerStartTime} - ${spot.ownerEndTime})`}
+                                            </span>
+                                        </div>
+                                    )}
+                                    
+                                    {spot.allOwners && spot.allOwners.length > 1 && (
+                                        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed #cbd5e1" }}>
+                                            <span style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
+                                                Todos los Abonados Registrados:
+                                            </span>
+                                            {spot.allOwners.map((owner: any) => {
+                                                const isCurrent = owner.licensePlate === spot.ownerPlate;
+                                                return (
+                                                    <div key={owner.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: isCurrent ? "var(--primary)" : "#64748b", padding: "2px 0", fontWeight: isCurrent ? "800" : "400" }}>
+                                                        <span>👤 {owner.name} ({owner.licensePlate})</span>
+                                                        <span>{owner.isAllDay ? "Todo el día" : `${formatWeekdaysSpanish(owner.weekdays)} (${owner.startTime}-${owner.endTime})`}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
                                 <div style={styles.infoRow}>
-                                    <span style={styles.label}>Asignado a:</span>
-                                    <span style={styles.value}>{spot.ownerName || "Desconocido"}</span>
+                                    <span style={styles.label}>Tipo de Sitio:</span>
+                                    <span style={styles.value}>GENERAL</span>
                                 </div>
                             )}
                             <div style={{ ...styles.infoRow, flexDirection: "column", alignItems: "center", marginTop: "16px", borderTop: "1px dashed #cbd5e1", paddingTop: "16px" }}>

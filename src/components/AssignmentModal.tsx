@@ -1,4 +1,4 @@
-﻿
+
 "use client";
 
 import { useState } from "react";
@@ -9,16 +9,34 @@ type AssignmentModalProps = {
   onConfirm: (plate: string) => void;
   spotCode: string;
   initialPlate: string;
+  onConvertToReserved?: () => Promise<void>;
 };
 
-export default function AssignmentModal({ isOpen, onClose, onConfirm, spotCode, initialPlate }: AssignmentModalProps) {
+export default function AssignmentModal({ isOpen, onClose, onConfirm, spotCode, initialPlate, onConvertToReserved }: AssignmentModalProps) {
   const [plate, setPlate] = useState(initialPlate);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onConfirm(plate);
+  };
+
+  const handleConvert = async () => {
+    if (confirm("¿Está seguro de que desea cambiar este sitio a Reservado / Abonado?")) {
+      setLoading(true);
+      try {
+        if (onConvertToReserved) {
+          await onConvertToReserved();
+        }
+        onClose();
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   const styles = {
@@ -127,6 +145,28 @@ export default function AssignmentModal({ isOpen, onClose, onConfirm, spotCode, 
             <button type="submit" style={styles.btnConfirm}>Confirmar Ingreso</button>
           </div>
         </form>
+
+        {onConvertToReserved && (
+          <button 
+            type="button" 
+            onClick={handleConvert} 
+            disabled={loading}
+            style={{ 
+              width: "100%",
+              padding: "12px 16px",
+              background: "#e0f2fe",
+              color: "#0369a1",
+              border: "1px solid #bae6fd",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "800",
+              fontSize: "13px",
+              marginTop: "16px"
+            }}
+          >
+            {loading ? "Procesando..." : "🔄 Convertir a Reservado / Abonado"}
+          </button>
+        )}
       </div>
     </div>
   );

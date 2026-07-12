@@ -2,12 +2,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { processVehicleEntry, processVehicleExit, AccessResult, occupySpot, freeSpot, updateSpotAssignment, removeSpotAssignment } from "@/lib/actions";
+import { processVehicleEntry, processVehicleExit, AccessResult, occupySpot, freeSpot, updateSpotAssignment, removeSpotAssignment, removeStaffMember, toggleSpotType } from "@/lib/actions";
 import { useRouter as useNextRouter } from "next/navigation";
 import ReservationModal from "@/components/ReservationModal";
-import AssignmentModal from "@/components/AssignmentModal";
 import ReleaseModal from "@/components/ReleaseModal";
-import SpotAdminModal from "@/components/SpotAdminModal";
 import { useAuth } from "@/lib/AuthContext";
 
 type Spot = {
@@ -24,6 +22,11 @@ type Spot = {
     entryTime?: string;
     monthlyFee?: number;
     accessId?: string;
+    allOwners?: any[];
+    ownerIsAllDay?: boolean;
+    ownerWeekdays?: string;
+    ownerStartTime?: string;
+    ownerEndTime?: string;
 };
 
 type Gate = {
@@ -82,17 +85,11 @@ export default function ParkingGrid({
     const [editingSpot, setEditingSpot] = useState<Spot | null>(null);
 
     // New state for General Assignment Modal
-    const [assignmentSpot, setAssignmentSpot] = useState<Spot | null>(null);
-
-    // New state for Release Modal
-    const [releasingSpot, setReleasingSpot] = useState<Spot | null>(null);
-
     const [activityDetail, setActivityDetail] = useState<Activity | null>(null);
     const [isMapExpanded, setIsMapExpanded] = useState(false);
     const [hasMovement, setHasMovement] = useState(false); // Track changes for refresh
 
     const [filter, setFilter] = useState<"ALL" | "FREE" | "OCCUPIED" | "RESERVED">("ALL");
-    const [adminEditingSpot, setAdminEditingSpot] = useState<Spot | null>(null);
 
     const { isAdmin, assignedAccessId, isSuperAdmin } = useAuth();
     const [selectedTowerId, setSelectedTowerId] = useState<string>("ALL");
@@ -158,59 +155,66 @@ export default function ParkingGrid({
     }
 
     async function handleSpotClick(spot: Spot) {
-        if (isAdmin) {
-            setAdminEditingSpot(spot);
-            return;
-        }
-
-        if (spot.isOccupied) {
-            setReleasingSpot(spot);
-        } else {
-            // Empty Spot Logic
-            if (spot.type === "RESERVED") {
-                // Open Modal for Assignment/Edit
-                setEditingSpot(spot);
-            } else {
-                // General Spot - Simple Visit Assignment
-                setAssignmentSpot(spot);
-            }
-        }
+        setEditingSpot(spot);
     }
+
     async function handleActivityClick(activity: Activity) {
         if (activity.cost || activity.exitTime) {
             setActivityDetail(activity);
         }
     }
 
-    async function handleRelease() {
-        if (!releasingSpot) return { success: false, cost: 0, durationInSeconds: 0 };
+    async function handleReleaseSpotMaster() {
+        if (!editingSpot) return { success: false, cost: 0, durationInSeconds: 0 };
         try {
-            const result = await freeSpot(releasingSpot.id);
+            const result = await freeSpot(editingSpot.id);
             if (result.success) {
-                updateSpotStatus(releasingSpot.id, false);
+                updateSpotStatus(editingSpot.id, false);
                 setHasMovement(true);
-                // We don't reload here, we wait for the modal to be closed via its Result view
+                setEditingSpot(prev => prev ? { ...prev, isOccupied: false, currentPlate: undefined } : null);
+                router.refresh();
                 return result;
             }
             return { success: false, cost: 0, durationInSeconds: 0 };
         } catch (e) {
             console.error(e);
-            alert("Error liberando sitio");
             return { success: false, cost: 0, durationInSeconds: 0 };
         }
     }
 
-    async function handleSaveReservation(data: { name: string; plate: string; phone: string; vacationStart?: Date | null; vacationEnd?: Date | null }) {
+    async function handleSaveReservation(data: {
+        id?: string;
+        name: string;
+        plate: string;
+        phone: string;
+        vacationStart?: Date | null;
+        vacationEnd?: Date | null;
+        isAllDay: boolean;
+        weekdays: string;
+        startTime: string;
+        endTime: string;
+        releasedDates: string;
+    }) {
         if (!editingSpot) return;
 
         try {
             await updateSpotAssignment(editingSpot.id, data);
             router.refresh();
+            setEditingSpot(null);
         } catch (e) {
             console.error(e);
             alert("Error actualizando reserva.");
-        } finally {
-            setEditingSpot(null);
+        }
+    }
+
+    async function handleDeleteStaff(staffId: string) {
+        try {
+            await removeStaffMember(staffId);
+            setEditingSpot(prev => prev ? { ...prev, allOwners: (prev.allOwners || []).filter((o: any) => o.id !== staffId) } : null);
+            router.refresh();
+        } catch (e) {
+            console.error(e);
+            alert("Error eliminando abonado del sitio.");
         }
     }
 
@@ -218,51 +222,70 @@ export default function ParkingGrid({
         if (!editingSpot) return;
         try {
             await removeSpotAssignment(editingSpot.id);
+            setEditingSpot(prev => prev ? { ...prev, allOwners: [] } : null);
             router.refresh();
         } catch (e) {
             console.error(e);
             alert("Error eliminando asignación");
-        } finally {
-            setEditingSpot(null);
         }
     }
 
-    async function handleAssignVisitor(plate: string) {
+    async function handleConvertToGeneral() {
         if (!editingSpot) return;
         try {
-            await occupySpot(editingSpot.id, plate, "MANUAL");
-            updateSpotStatus(editingSpot.id, true, plate);
+            await removeSpotAssignment(editingSpot.id);
+            await toggleSpotType(editingSpot.id);
+            updateSpotType(editingSpot.id, "GENERAL");
+            setEditingSpot(prev => prev ? { ...prev, type: "GENERAL", allOwners: [] } : null);
+            router.refresh();
+        } catch (e) {
+            console.error(e);
+            alert("Error al convertir a general.");
+        }
+    }
+
+    async function handleConvertToReserved() {
+        if (!editingSpot) return;
+        try {
+            await toggleSpotType(editingSpot.id);
+            updateSpotType(editingSpot.id, "RESERVED");
+            setEditingSpot(prev => prev ? { ...prev, type: "RESERVED" } : null);
+            router.refresh();
+        } catch (e) {
+            console.error(e);
+            alert("Error al convertir a reservado.");
+        }
+    }
+
+    async function handleAssignVisitor(plate: string, visitorName?: string) {
+        if (!editingSpot) return;
+        const finalPlate = plate || "VISITA";
+        try {
+            await occupySpot(editingSpot.id, finalPlate, "MANUAL", undefined, visitorName);
+            updateSpotStatus(editingSpot.id, true, finalPlate, visitorName);
+            setEditingSpot(prev => prev ? { ...prev, isOccupied: true, currentPlate: finalPlate, currentVisitorName: visitorName } : null);
             setPlateInput("");
             router.refresh();
         } catch (e) {
             console.error(e);
             alert("Error asignando visita");
-        } finally {
-            setEditingSpot(null);
         }
     }
 
-    async function handleGeneralAssignment(plate: string) {
-        if (!assignmentSpot) return;
-        const finalPlate = plate || "VISITA";
-        try {
-            await occupySpot(assignmentSpot.id, finalPlate, "MANUAL");
-            updateSpotStatus(assignmentSpot.id, true, finalPlate);
-            setPlateInput("");
-            router.refresh();
-        } catch (e) {
-            console.error(e);
-            alert("Error asignando sitio general");
-        } finally {
-            setAssignmentSpot(null);
-        }
+    function updateSpotType(id: number, type: "RESERVED" | "GENERAL") {
+        setSpots(prev => prev.map(s => s.id === id ? {
+            ...s,
+            type,
+            allOwners: type === "GENERAL" ? [] : s.allOwners
+        } : s));
     }
 
-    function updateSpotStatus(id: number, occupied: boolean, plate?: string) {
+    function updateSpotStatus(id: number, occupied: boolean, plate?: string, visitorName?: string) {
         setSpots(prev => prev.map(s => s.id === id ? {
             ...s,
             isOccupied: occupied,
             currentPlate: occupied ? plate : undefined,
+            currentVisitorName: occupied ? visitorName : undefined,
             entryTime: occupied ? new Date().toISOString() : undefined
         } : s));
     }
@@ -285,11 +308,19 @@ export default function ParkingGrid({
     const isReleased = isExclusivityReleased();
 
     const isSpotFree = (s: Spot) => {
-        if (isReleased) {
-            return !s.isOccupied;
-        } else {
-            return !s.isOccupied && s.type !== "RESERVED";
+        if (s.isOccupied) return false;
+        if (s.type !== "RESERVED") return true;
+
+        if (!s.ownerPlate) {
+            return true; // No active owner right now -> Free!
         }
+
+        if (isReleased) {
+            // General release rule is active. Only release all-day spots, respect custom scheduled ones!
+            return s.ownerIsAllDay === true;
+        }
+
+        return false;
     };
 
     // filtering logic
@@ -597,8 +628,8 @@ export default function ParkingGrid({
                                                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                                                         {spot.type === "RESERVED" ? (
                                                             <>
-                                                                <span style={{ fontSize: "10px", opacity: 0.9, color: "#334155", fontWeight: "700" }}>{spot.ownerName ? spot.ownerPlate : "LIBRE"}</span>
-                                                                {isReleased && (
+                                                                <span style={{ fontSize: "10px", opacity: 0.9, color: "#334155", fontWeight: "700" }}>{spot.ownerPlate || "LIBRE"}</span>
+                                                                {(!spot.ownerPlate || (isReleased && spot.ownerIsAllDay === true)) && (
                                                                     <span style={{ fontSize: "8px", background: "#22c55e", color: "white", padding: "1px 4px", borderRadius: "3px", marginTop: "2px", fontWeight: "800" }}>LIBERADO</span>
                                                                 )}
                                                                 {spot.vacationStart && spot.vacationEnd && (
@@ -823,49 +854,16 @@ export default function ParkingGrid({
                     isOpen={!!editingSpot}
                     onClose={() => setEditingSpot(null)}
                     onSave={handleSaveReservation}
-                    onDelete={handleDeleteAssignment}
+                    onDeleteStaff={handleDeleteStaff}
+                    onDeleteSpotAll={handleDeleteAssignment}
                     onAssignVisitor={handleAssignVisitor}
-                    preFilledVisitorPlate={plateInput}
-                    initialData={{
-                        name: editingSpot.ownerName || "",
-                        plate: editingSpot.ownerPlate || "",
-                        phone: editingSpot.ownerPhone || "+569 ",
-                        spotCode: editingSpot.code,
-                        vacationStart: editingSpot.vacationStart,
-                        vacationEnd: editingSpot.vacationEnd
-                    }}
-                />
-            )}
-
-            {assignmentSpot && (
-                <AssignmentModal
-                    isOpen={!!assignmentSpot}
-                    onClose={() => setAssignmentSpot(null)}
-                    onConfirm={handleGeneralAssignment}
-                    spotCode={assignmentSpot.code}
-                    initialPlate={plateInput || "VISITA"}
-                />
-            )}
-
-            {releasingSpot && (
-                <ReleaseModal
-                    isOpen={!!releasingSpot}
-                    onClose={() => {
-                        setReleasingSpot(null);
-                        if (hasMovement) {
-                            setHasMovement(false);
-                            router.refresh();
-                        }
-                    }}
-                    onRelease={handleRelease}
+                    onReleaseSpot={handleReleaseSpotMaster}
+                    onConvertToGeneral={handleConvertToGeneral}
+                    onConvertToReserved={handleConvertToReserved}
                     chargingEnabled={chargingEnabled}
-                    spot={{
-                        code: releasingSpot.code,
-                        type: releasingSpot.type,
-                        ownerName: releasingSpot.ownerName,
-                        ownerPhone: releasingSpot.ownerPhone,
-                        currentPlate: releasingSpot.currentPlate
-                    }}
+                    isAdmin={isAdmin}
+                    preFilledVisitorPlate={plateInput}
+                    spot={editingSpot}
                 />
             )}
 
@@ -1000,28 +998,6 @@ export default function ParkingGrid({
                 </div>
             )}
 
-            {adminEditingSpot && (
-                <SpotAdminModal
-                    spot={adminEditingSpot}
-                    onClose={() => setAdminEditingSpot(null)}
-                    onOpenAssignment={() => {
-                        if (adminEditingSpot.isOccupied) {
-                            setReleasingSpot(adminEditingSpot);
-                        } else if (adminEditingSpot.type === "RESERVED") {
-                            setEditingSpot(adminEditingSpot);
-                        } else {
-                            setAssignmentSpot(adminEditingSpot);
-                        }
-                    }}
-                    onToggleType={(updatedSpot) => {
-                        setSpots(prev => prev.map(s => s.id === updatedSpot.id ? updatedSpot : s));
-                        setAdminEditingSpot(null);
-                        if (updatedSpot.type === "RESERVED") {
-                            setEditingSpot(updatedSpot);
-                        }
-                    }}
-                />
-            )}
         </div>
     );
 }

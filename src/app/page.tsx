@@ -1,6 +1,7 @@
 
 import ParkingGrid from "@/components/ParkingGrid";
 import { getPricePerMinute, isChargingEnabled, getBranding } from "@/lib/actions";
+import { getActiveOwnerHelper } from "@/lib/utils";
 import HeaderActions from "@/components/HeaderActions";
 import RoleSelector from "@/components/RoleSelector";
 import UserManager from "@/components/UserManager";
@@ -67,17 +68,36 @@ export default async function Home() {
   }
 
   const enrichedSpots = spots.map((spot: any) => {
-    const assignedStaff: any = staff.find((s: any) => s.assignedSpotId === spot.id);
+    const spotStaff = staff.filter((s: any) => s.assignedSpotId === spot.id);
+    const activeOwner = getActiveOwnerHelper(spot.id, staff);
     const activeRecord: any = activeRecords.find((r: any) => r.spotId === spot.id);
 
     return {
       ...spot,
-      ownerPlate: assignedStaff ? assignedStaff.licensePlate : undefined,
-      ownerName: assignedStaff ? assignedStaff.name : undefined,
-      ownerPhone: assignedStaff ? (assignedStaff.phoneNumber || undefined) : undefined,
-      vacationStart: assignedStaff && assignedStaff.vacationStart ? assignedStaff.vacationStart.toISOString() : undefined,
-      vacationEnd: assignedStaff && assignedStaff.vacationEnd ? assignedStaff.vacationEnd.toISOString() : undefined,
+      allOwners: spotStaff.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        licensePlate: s.licensePlate,
+        phoneNumber: s.phoneNumber || "",
+        vacationStart: s.vacationStart ? s.vacationStart.toISOString() : null,
+        vacationEnd: s.vacationEnd ? s.vacationEnd.toISOString() : null,
+        isAllDay: s.isAllDay,
+        weekdays: s.weekdays || "",
+        startTime: s.startTime || "",
+        endTime: s.endTime || "",
+        releasedDates: s.releasedDates || ""
+      })),
+      ownerPlate: activeOwner ? activeOwner.licensePlate : undefined,
+      ownerName: activeOwner ? activeOwner.name : undefined,
+      ownerPhone: activeOwner ? (activeOwner.phoneNumber || undefined) : undefined,
+      ownerIsAllDay: activeOwner ? activeOwner.isAllDay : undefined,
+      ownerWeekdays: activeOwner ? (activeOwner.weekdays || undefined) : undefined,
+      ownerStartTime: activeOwner ? (activeOwner.startTime || undefined) : undefined,
+      ownerEndTime: activeOwner ? (activeOwner.endTime || undefined) : undefined,
+      vacationStart: activeOwner && activeOwner.vacationStart ? activeOwner.vacationStart.toISOString() : undefined,
+      vacationEnd: activeOwner && activeOwner.vacationEnd ? activeOwner.vacationEnd.toISOString() : undefined,
       currentPlate: activeRecord ? activeRecord.licensePlate : undefined,
+      currentVisitorName: activeRecord ? activeRecord.visitorName : undefined,
       entryTime: activeRecord && activeRecord.entryTime ? activeRecord.entryTime.toISOString() : undefined,
       monthlyFee: spot.monthlyFee ?? undefined,
       accessId: spot.accessId ?? undefined

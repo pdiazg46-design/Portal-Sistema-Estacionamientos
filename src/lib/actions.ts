@@ -4,6 +4,7 @@ import { db } from "./db";
 import { parkingSpots, staffMembers, parkingRecords, settings, users, accesses, cameras } from "./schema";
 import { eq, and, or, isNull, lte, gte, sql, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { getActiveOwnerHelper, normalizePlate, getChileDate, getChileDateString } from "./utils";
 
 export type AccessResult = {
   allowed: boolean;
@@ -27,10 +28,7 @@ function applyChileanRounding(amount: number): number {
   return Math.round(amount / 10) * 10;
 }
 
-function normalizePlate(plate: string): string {
-  if (!plate) return "";
-  return plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-}
+
 
 export async function getPricePerMinute(): Promise<number> {
   try {
@@ -133,7 +131,7 @@ export async function updateBranding(data: {
 }
 
 export async function processVehicleEntry(licensePlate: string, accessId: string): Promise<AccessResult> {
-  const today = new Date();
+  const today = getChileDate();
   const normalizedPlate = normalizePlate(licensePlate);
 
   const staffResults = await db.select().from(staffMembers).where(eq(staffMembers.licensePlate, normalizedPlate));
@@ -141,9 +139,45 @@ export async function processVehicleEntry(licensePlate: string, accessId: string
 
   if (staff) {
     const onVacation = staff.vacationStart && staff.vacationEnd &&
-      staff.vacationStart <= today && staff.vacationEnd >= today;
+      getChileDate(new Date(staff.vacationStart)) <= today && getChileDate(new Date(staff.vacationEnd)) >= today;
 
-    if (!onVacation && staff.assignedSpotId) {
+    let isReleasedToday = false;
+    if (staff.releasedDates) {
+      const todayStr = getChileDateString();
+      if (staff.releasedDates.split(",").includes(todayStr)) {
+        isReleasedToday = true;
+      }
+    }
+
+    let isScheduledNow = true;
+    if (!staff.isAllDay) {
+      const currentDayNum = today.getDay();
+      const weekdayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+      const currentDayName = weekdayNames[currentDayNum];
+
+      const allowedDays = staff.weekdays ? staff.weekdays.split(",") : [];
+      if (!allowedDays.includes(currentDayName)) {
+        isScheduledNow = false;
+      } else if (staff.startTime && staff.endTime) {
+        const [startH, startM] = staff.startTime.split(":").map(Number);
+        const [endH, endM] = staff.endTime.split(":").map(Number);
+
+        const currentH = today.getHours();
+        const currentM = today.getMinutes();
+
+        const currentMins = currentH * 60 + currentM;
+        const startMins = startH * 60 + startM;
+        const endMins = endH * 60 + endM;
+
+        if (currentMins < startMins || currentMins > endMins) {
+          isScheduledNow = false;
+        }
+      }
+    }
+
+    const isActive = !onVacation && !isReleasedToday && isScheduledNow;
+
+    if (isActive && staff.assignedSpotId) {
       // Check spot status
       const spotResults = await db.select().from(parkingSpots).where(eq(parkingSpots.id, staff.assignedSpotId));
       const spot = spotResults[0];
@@ -165,10 +199,20 @@ export async function processVehicleEntry(licensePlate: string, accessId: string
           entryType: "MANUAL"
         };
       }
-    } else if (onVacation) {
+    } else {
+      let failMessage = "";
+      if (onVacation) {
+        failMessage = `Abonado ${staff.name} está de vacaciones. Asignar como Visita.`;
+      } else if (isReleasedToday) {
+        failMessage = `Abonado ${staff.name} liberó su reserva para el día de hoy. Asignar como Visita.`;
+      } else if (!isScheduledNow) {
+        failMessage = `Abonado ${staff.name} fuera de su horario de reserva (${staff.startTime || "00:00"} - ${staff.endTime || "00:00"}). Asignar como Visita.`;
+      } else {
+        failMessage = `Abonado ${staff.name} no tiene reserva activa hoy. Asignar como Visita.`;
+      }
       return {
         allowed: false,
-        message: `Abonado ${staff.name} está de vacaciones. Asignar como Visita.`,
+        message: failMessage,
         staff,
         entryType: "MANUAL"
       };
@@ -184,7 +228,7 @@ export async function processVehicleEntry(licensePlate: string, accessId: string
 
 
 
-export async function occupySpot(spotId: number, licensePlate: string, type: "AUTOMATIC" | "MANUAL", accessId?: string) {
+export async function occupySpot(spotId: number, licensePlate: string, type: "AUTOMATIC" | "MANUAL", accessId?: string, visitorName?: string) {
   const normalizedPlate = normalizePlate(licensePlate);
   console.log(`[Action] Attempting occupySpot: Spot ${spotId}, Plate ${normalizedPlate}, Type ${type}`);
   try {
@@ -210,7 +254,8 @@ export async function occupySpot(spotId: number, licensePlate: string, type: "AU
         spotId,
         entryType: type,
         entryAccessId: accessId,
-        entryTime: new Date()
+        entryTime: new Date(),
+        visitorName: visitorName || null
       });
     });
     console.log(`[Action] Successfully occupied spot ${spotId} with plate ${normalizedPlate}`);
@@ -280,22 +325,40 @@ export async function freeSpot(spotId: number) {
   return result;
 }
 
-export async function updateSpotAssignment(spotId: number, data: { name: string; plate: string; phone: string; vacationStart?: Date | null; vacationEnd?: Date | null }) {
+export async function updateSpotAssignment(
+  spotId: number, 
+  data: { 
+    id?: string;
+    name: string; 
+    plate: string; 
+    phone: string; 
+    vacationStart?: Date | null; 
+    vacationEnd?: Date | null;
+    isAllDay?: boolean;
+    weekdays?: string;
+    startTime?: string;
+    endTime?: string;
+    releasedDates?: string;
+  }
+) {
   const normalizedPlate = normalizePlate(data.plate);
-  const currentStaffResult = await db.select().from(staffMembers).where(eq(staffMembers.assignedSpotId, spotId));
-  const currentStaff = currentStaffResult[0];
 
   await db.transaction(async (tx: any) => {
-    if (currentStaff) {
+    if (data.id) {
       await tx.update(staffMembers)
         .set({
           name: data.name,
           licensePlate: normalizedPlate,
           phoneNumber: data.phone,
           vacationStart: data.vacationStart,
-          vacationEnd: data.vacationEnd
+          vacationEnd: data.vacationEnd,
+          isAllDay: data.isAllDay !== undefined ? data.isAllDay : true,
+          weekdays: data.weekdays || null,
+          startTime: data.startTime || null,
+          endTime: data.endTime || null,
+          releasedDates: data.releasedDates || null
         })
-        .where(eq(staffMembers.id, currentStaff.id));
+        .where(eq(staffMembers.id, data.id));
     } else {
       await tx.insert(staffMembers).values({
         name: data.name,
@@ -304,8 +367,38 @@ export async function updateSpotAssignment(spotId: number, data: { name: string;
         role: "Abonado",
         assignedSpotId: spotId,
         vacationStart: data.vacationStart,
-        vacationEnd: data.vacationEnd
+        vacationEnd: data.vacationEnd,
+        isAllDay: data.isAllDay !== undefined ? data.isAllDay : true,
+        weekdays: data.weekdays || null,
+        startTime: data.startTime || null,
+        endTime: data.endTime || null,
+        releasedDates: data.releasedDates || null
       });
+    }
+
+    // Set spot type to RESERVED
+    await tx.update(parkingSpots)
+      .set({ type: "RESERVED" })
+      .where(eq(parkingSpots.id, spotId));
+  });
+  safeRevalidate();
+}
+
+export async function removeStaffMember(staffId: string) {
+  await db.transaction(async (tx: any) => {
+    const staff = (await tx.select().from(staffMembers).where(eq(staffMembers.id, staffId)))[0];
+    
+    await tx.update(staffMembers)
+      .set({ assignedSpotId: null })
+      .where(eq(staffMembers.id, staffId));
+
+    if (staff && staff.assignedSpotId) {
+      const remaining = await tx.select().from(staffMembers).where(eq(staffMembers.assignedSpotId, staff.assignedSpotId));
+      if (remaining.length === 0) {
+        await tx.update(parkingSpots)
+          .set({ type: "GENERAL" })
+          .where(eq(parkingSpots.id, staff.assignedSpotId));
+      }
     }
   });
   safeRevalidate();
@@ -316,6 +409,10 @@ export async function removeSpotAssignment(spotId: number) {
     await tx.update(staffMembers)
       .set({ assignedSpotId: null })
       .where(eq(staffMembers.assignedSpotId, spotId));
+
+    await tx.update(parkingSpots)
+      .set({ type: "GENERAL" })
+      .where(eq(parkingSpots.id, spotId));
   });
   safeRevalidate();
 }
@@ -637,7 +734,7 @@ export async function getAvailableGeneralSpots(accessId?: string) {
     
     if (releaseReservedSpots) {
       const [hours, minutes] = releaseReservedTime.split(":").map(Number);
-      const now = new Date();
+      const now = getChileDate();
       const currentHours = now.getHours();
       const currentMinutes = now.getMinutes();
       const nowMins = currentHours * 60 + currentMinutes;
@@ -650,37 +747,42 @@ export async function getAvailableGeneralSpots(accessId?: string) {
     console.error("Error reading release settings in LPR:", e);
   }
 
-  const typeCondition = releaseActive 
-    ? or(eq(parkingSpots.type, "GENERAL"), eq(parkingSpots.type, "RESERVED"))
-    : eq(parkingSpots.type, "GENERAL");
-
-  let query = db.select()
-    .from(parkingSpots)
-    .where(and(
-      typeCondition,
-      eq(parkingSpots.isOccupied, false)
-    ));
-
-  if (accessId && accessId !== "ALL") {
-    // Filter spots belonging to this access gate, OR spots with no specific gate association (accessId IS NULL)
-    query = db.select()
-      .from(parkingSpots)
-      .where(and(
-        typeCondition,
-        eq(parkingSpots.isOccupied, false),
-        or(
-          eq(parkingSpots.accessId, accessId),
-          isNull(parkingSpots.accessId)
-        )
-      ));
+  let allSpots = [];
+  let allStaff = [];
+  try {
+    allSpots = await db.select().from(parkingSpots);
+    allStaff = await db.select().from(staffMembers);
+  } catch (e) {
+    console.error("Error fetching spots or staff in LPR:", e);
+    return [];
   }
 
-  // NEW: Enforce Sequential Assignment (Low -> High)
-  // We sort by ID to ensure stability, or Code if alphanumeric logic is preferred. 
-  // Using ID is usually safest for "filling up" if IDs are sequential.
-  // If codes are "A1", "A2", etc., code sorting is better.
-  // Let's us ID for now as it maps to insertion order usually.
-  return await query.orderBy(asc(parkingSpots.id));
+  const today = getChileDate();
+
+  const availableSpots = allSpots.filter((spot: any) => {
+    if (spot.isOccupied) return false;
+
+    if (accessId && accessId !== "ALL") {
+      if (spot.accessId && spot.accessId !== accessId) return false;
+    }
+
+    if (spot.type === "GENERAL") return true;
+
+    // Spot is RESERVED:
+    const activeOwner = getActiveOwnerHelper(spot.id, allStaff);
+    if (!activeOwner) {
+      return true; // No active owner right now -> Free!
+    }
+
+    if (releaseActive) {
+      // General release is active. Only release all-day spots, respect custom scheduled ones!
+      return activeOwner.isAllDay === true;
+    }
+
+    return false;
+  });
+
+  return availableSpots.sort((a: any, b: any) => a.id - b.id);
 }
 
 export async function getSpotCounts(towerId: string = "T1") {
@@ -987,4 +1089,460 @@ export async function renameTower(oldTowerId: string, newTowerId: string) {
   });
 
   safeRevalidate();
+}
+
+export async function getLastBulkUpload() {
+  try {
+    const result = (await db.select().from(settings).where(eq(settings.key, "last_bulk_upload")))[0];
+    if (result && result.value) {
+      return JSON.parse(result.value);
+    }
+  } catch (e) {
+    console.error("Error reading last bulk upload metadata:", e);
+  }
+  return null;
+}
+
+export async function bulkUploadStaff(csvText: string, overwriteAll: boolean, username: string) {
+  try {
+    const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== "");
+    if (lines.length === 0) {
+      return { success: false, errors: ["El archivo está vacío."], warnings: [] };
+    }
+
+    // Detect delimiter
+    const firstLine = lines[0];
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const semicolonCount = (firstLine.match(/;/g) || []).length;
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+
+    let delimiter = ",";
+    if (semicolonCount > commaCount && semicolonCount > tabCount) {
+      delimiter = ";";
+    } else if (tabCount > commaCount && tabCount > semicolonCount) {
+      delimiter = "\t";
+    }
+
+    const parseLine = (line: string) => {
+      const result = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === delimiter && !inQuotes) {
+          result.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const cleanHeader = (h: string) => {
+      return h.toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // remove accents
+        .replace(/\s+/g, "_")
+        .trim();
+    };
+
+    const headers = parseLine(lines[0]).map(cleanHeader);
+    const expectedHeaders = ["SITIO", "NOMBRE", "PATENTE"];
+    const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+    if (missingHeaders.length > 0) {
+      return { 
+        success: false, 
+        errors: [`Columnas requeridas faltantes: ${missingHeaders.join(", ")}`], 
+        warnings: [] 
+      };
+    }
+
+    // Fetch all spots to map codes
+    const spots = await db.select().from(parkingSpots);
+    const spotMap = new Map<string, number>();
+    spots.forEach((s: any) => {
+      spotMap.set(s.code.toUpperCase(), s.id);
+    });
+
+    const parsedRows: any[] = [];
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Helper functions
+    const parseDateHelper = (dateStr: string | undefined): Date | null => {
+      if (!dateStr) return null;
+      const cleaned = dateStr.trim();
+      if (!cleaned) return null;
+
+      // YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+        const d = new Date(cleaned + "T00:00:00");
+        return isNaN(d.getTime()) ? null : d;
+      }
+      // DD-MM-YYYY or DD/MM/YYYY
+      const match = cleaned.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (match) {
+        const dd = match[1].padStart(2, "0");
+        const mm = match[2].padStart(2, "0");
+        const yyyy = match[3];
+        const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const d = new Date(cleaned);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    const mapWeekdaysSpanish = (diasStr: string | undefined): string => {
+      if (!diasStr) return "MON,TUE,WED,THU,FRI";
+      const parts = diasStr.split(",").map(d => d.trim().toUpperCase());
+      const mapping: { [key: string]: string } = {
+        "LUN": "MON", "LUNES": "MON",
+        "MAR": "TUE", "MARTES": "TUE",
+        "MIE": "WED", "MIERCOLES": "WED", "MIÉRCOLES": "WED",
+        "JUE": "THU", "JUEVES": "THU",
+        "VIE": "FRI", "VIERNES": "FRI",
+        "SAB": "SAT", "SABADO": "SAT", "SÁBADO": "SAT",
+        "DOM": "SUN", "DOMINGO": "SUN"
+      };
+      const mapped = parts
+        .map(p => mapping[p] || p)
+        .filter(p => ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].includes(p));
+      return mapped.length > 0 ? mapped.join(",") : "MON,TUE,WED,THU,FRI";
+    };
+
+    const formatPhoneNumber = (numStr: string): string => {
+      let cleaned = numStr.trim();
+      if (!cleaned) return "";
+      
+      // Expand scientific notation if detected (e.g. 5,6911E+10 or 5.6911E+10)
+      if (/^\d+([.,]\d+)?E\+?\d+$/i.test(cleaned)) {
+        const normalized = cleaned.replace(",", ".");
+        const num = Number(normalized);
+        if (!isNaN(num)) {
+          return "+" + Math.round(num).toString();
+        }
+      }
+      return cleaned;
+    };
+
+    // Parse each row
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseLine(lines[i]);
+      if (values.length === 0 || (values.length === 1 && values[0] === "")) continue;
+
+      const row: any = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index] !== undefined ? values[index].trim() : "";
+      });
+
+      const lineNum = i + 1;
+      const sitio = row["SITIO"] || "";
+      const nombre = row["NOMBRE"] || "";
+      const patente = row["PATENTE"] || "";
+      const telefono = row["TELEFONO"] || "";
+      const todoElDiaStr = (row["TODO_EL_DIA"] || row["TODO_EL_DJA"] || "SI").toUpperCase();
+      const diasStr = row["DIAS"] || "";
+      const horaInicio = row["HORA_INICIO"] || "";
+      const horaFin = row["HORA_FIN"] || "";
+      const vacDesdeStr = row["VACACIONES_DESDE"] || "";
+      const vacHastaStr = row["VACACIONES_HASTA"] || "";
+      const liberacionesStr = row["LIBERACIONES"] || "";
+
+      // Validation
+      if (!sitio) {
+        errors.push(`Fila ${lineNum}: El campo SITIO es obligatorio.`);
+        continue;
+      }
+
+      const spotId = spotMap.get(sitio.toUpperCase());
+      if (!spotId) {
+        errors.push(`Fila ${lineNum}: El sitio '${sitio}' no existe.`);
+        continue;
+      }
+
+      if (!nombre) {
+        errors.push(`Fila ${lineNum}: El campo NOMBRE es obligatorio.`);
+        continue;
+      }
+
+      if (!patente) {
+        errors.push(`Fila ${lineNum}: El campo PATENTE es obligatorio.`);
+        continue;
+      }
+
+      const normalizedPlate = normalizePlate(patente);
+      if (normalizedPlate.length < 4 || normalizedPlate.length > 10) {
+        errors.push(`Fila ${lineNum}: La patente '${patente}' no tiene un formato válido.`);
+        continue;
+      }
+
+      const isAllDay = todoElDiaStr === "SI" || todoElDiaStr === "YES" || todoElDiaStr === "TRUE";
+      let weekdays = null;
+      let startTime = null;
+      let endTime = null;
+
+      if (!isAllDay) {
+        if (!horaInicio || !horaFin) {
+          errors.push(`Fila ${lineNum}: Debes indicar HORA_INICIO y HORA_FIN si no es todo el día.`);
+          continue;
+        }
+        weekdays = mapWeekdaysSpanish(diasStr);
+        startTime = horaInicio;
+        endTime = horaFin;
+      }
+
+      // Vacations
+      let vacationStart: Date | null = null;
+      let vacationEnd: Date | null = null;
+      if (vacDesdeStr || vacHastaStr) {
+        if (!vacDesdeStr || !vacHastaStr) {
+          errors.push(`Fila ${lineNum}: Debes indicar tanto fecha de inicio como de fin para las vacaciones.`);
+          continue;
+        }
+        const start = parseDateHelper(vacDesdeStr);
+        const end = parseDateHelper(vacHastaStr);
+        if (!start || !end) {
+          errors.push(`Fila ${lineNum}: Formato de fecha de vacaciones inválido (use YYYY-MM-DD o DD-MM-YYYY).`);
+          continue;
+        }
+        if (end < start) {
+          errors.push(`Fila ${lineNum}: La fecha de fin de vacaciones no puede ser anterior a la de inicio.`);
+          continue;
+        }
+        vacationStart = start;
+        vacationEnd = end;
+      }
+
+      // Releases
+      let releasedDates: string | null = null;
+      if (liberacionesStr) {
+        const dates = liberacionesStr.split(",").map(d => d.trim()).filter(d => d !== "");
+        const validDates: string[] = [];
+        let dateError = false;
+        for (const d of dates) {
+          const parsed = parseDateHelper(d);
+          if (!parsed) {
+            errors.push(`Fila ${lineNum}: Fecha de liberación '${d}' inválida (use YYYY-MM-DD o DD-MM-YYYY).`);
+            dateError = true;
+            break;
+          }
+          const yyyy = parsed.getFullYear();
+          const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+          const dd = String(parsed.getDate()).padStart(2, "0");
+          validDates.push(`${yyyy}-${mm}-${dd}`);
+        }
+        if (dateError) continue;
+        releasedDates = validDates.sort().join(",");
+      }
+
+      parsedRows.push({
+        spotId,
+        sitio,
+        name: nombre,
+        plate: normalizedPlate,
+        phone: formatPhoneNumber(telefono),
+        isAllDay,
+        weekdays,
+        startTime,
+        endTime,
+        vacationStart,
+        vacationEnd,
+        releasedDates
+      });
+    }
+
+    if (errors.length > 0) {
+      return { success: false, errors, warnings };
+    }
+
+    if (parsedRows.length === 0) {
+      return { success: false, errors: ["No se encontraron filas de abonados válidas para procesar."], warnings };
+    }
+
+    // Plate uniqueness check
+    const plateCounts = new Map<string, number>();
+    parsedRows.forEach(r => {
+      plateCounts.set(r.plate, (plateCounts.get(r.plate) || 0) + 1);
+    });
+    for (const [plate, count] of plateCounts.entries()) {
+      if (count > 1) {
+        errors.push(`La patente '${plate}' está duplicada en el archivo de carga.`);
+      }
+    }
+    if (errors.length > 0) {
+      return { success: false, errors, warnings };
+    }
+
+    // Database transaction
+    await db.transaction(async (tx: any) => {
+      if (overwriteAll) {
+        // Clear all staff members assignments
+        await tx.update(staffMembers).set({ assignedSpotId: null });
+      } else {
+        // Clear assignments only for the spots mentioned in this CSV
+        const spotIds = Array.from(new Set(parsedRows.map(r => r.spotId))) as number[];
+        for (const spotId of spotIds) {
+          await tx.update(staffMembers).set({ assignedSpotId: null }).where(eq(staffMembers.assignedSpotId, spotId));
+        }
+      }
+
+      const loadedSpotIds = Array.from(new Set(parsedRows.map(r => r.spotId))) as number[];
+
+      // Insert/Create new staff members and assign to spots
+      for (const row of parsedRows) {
+        // Check if staff member with this plate already exists
+        const existingStaff = (await tx.select().from(staffMembers).where(eq(staffMembers.licensePlate, row.plate)))[0];
+        if (existingStaff) {
+          // Update details and link to spot
+          await tx.update(staffMembers)
+            .set({
+              name: row.name,
+              phoneNumber: row.phone,
+              assignedSpotId: row.spotId,
+              isAllDay: row.isAllDay,
+              weekdays: row.weekdays,
+              startTime: row.startTime,
+              endTime: row.endTime,
+              vacationStart: row.vacationStart,
+              vacationEnd: row.vacationEnd,
+              releasedDates: row.releasedDates
+            })
+            .where(eq(staffMembers.id, existingStaff.id));
+        } else {
+          // Create new staff member
+          await tx.insert(staffMembers).values({
+            name: row.name,
+            role: "Abonado",
+            licensePlate: row.plate,
+            phoneNumber: row.phone,
+            assignedSpotId: row.spotId,
+            isAllDay: row.isAllDay,
+            weekdays: row.weekdays,
+            startTime: row.startTime,
+            endTime: row.endTime,
+            vacationStart: row.vacationStart,
+            vacationEnd: row.vacationEnd,
+            releasedDates: row.releasedDates
+          });
+        }
+        
+        // Update spot type to RESERVED
+        await tx.update(parkingSpots).set({ type: "RESERVED" }).where(eq(parkingSpots.id, row.spotId));
+      }
+
+      if (overwriteAll) {
+        // Set all spots not in loadedSpotIds to GENERAL
+        const allSpots = await tx.select().from(parkingSpots);
+        for (const spot of allSpots) {
+          if (!loadedSpotIds.includes(spot.id)) {
+            await tx.update(parkingSpots).set({ type: "GENERAL" }).where(eq(parkingSpots.id, spot.id));
+          }
+        }
+      }
+      
+      // Log metadata to settings
+      const uploadMetadata = {
+        username,
+        timestamp: new Date().toISOString(),
+        successCount: parsedRows.length,
+        overwriteAll
+      };
+      
+      const existingSetting = (await tx.select().from(settings).where(eq(settings.key, "last_bulk_upload")))[0];
+      if (existingSetting) {
+        await tx.update(settings).set({ value: JSON.stringify(uploadMetadata) }).where(eq(settings.key, "last_bulk_upload"));
+      } else {
+        await tx.insert(settings).values({ key: "last_bulk_upload", value: JSON.stringify(uploadMetadata) });
+      }
+    });
+
+    safeRevalidate();
+    return { success: true, errors: [], warnings };
+  } catch (e: any) {
+    console.error("Bulk upload action failed:", e);
+    return { success: false, errors: [`Error del servidor: ${e.message}`], warnings: [] };
+  }
+}
+
+export async function exportCurrentAssignments() {
+  try {
+    const list = await db.select({
+      spotCode: parkingSpots.code,
+      name: staffMembers.name,
+      licensePlate: staffMembers.licensePlate,
+      phoneNumber: staffMembers.phoneNumber,
+      isAllDay: staffMembers.isAllDay,
+      weekdays: staffMembers.weekdays,
+      startTime: staffMembers.startTime,
+      endTime: staffMembers.endTime,
+      vacationStart: staffMembers.vacationStart,
+      vacationEnd: staffMembers.vacationEnd,
+      releasedDates: staffMembers.releasedDates
+    })
+    .from(staffMembers)
+    .innerJoin(parkingSpots, eq(staffMembers.assignedSpotId, parkingSpots.id));
+
+    // Generate CSV content with semicolon delimiter
+    const headers = [
+      "SITIO", "NOMBRE", "PATENTE", "TELEFONO", "TODO_EL_DIA",
+      "DIAS", "HORA_INICIO", "HORA_FIN",
+      "VACACIONES_DESDE", "VACACIONES_HASTA", "LIBERACIONES"
+    ];
+
+    const formatDateStr = (date: any): string => {
+      if (!date) return "";
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "";
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const mapWeekdaysToSpanish = (weekdaysStr: string | null | undefined): string => {
+      if (!weekdaysStr) return "";
+      const parts = weekdaysStr.split(",").map(d => d.trim().toUpperCase());
+      const mapping: { [key: string]: string } = {
+        "MON": "LUN", "TUE": "MAR", "WED": "MIE", "THU": "JUE", "FRI": "VIE", "SAT": "SAB", "SUN": "DOM"
+      };
+      return parts.map(p => mapping[p] || p).join(",");
+    };
+
+    const csvLines = [headers.join(";")];
+
+    list.forEach((s: any) => {
+      const todoElDiaVal = s.isAllDay ? "SI" : "NO";
+      const row = [
+        s.spotCode || "",
+        s.name || "",
+        s.licensePlate || "",
+        s.phoneNumber || "",
+        todoElDiaVal,
+        mapWeekdaysToSpanish(s.weekdays),
+        s.startTime || "",
+        s.endTime || "",
+        formatDateStr(s.vacationStart),
+        formatDateStr(s.vacationEnd),
+        s.releasedDates || ""
+      ];
+      // Escape quotes and join with semicolon
+      const cleanRow = row.map(val => {
+        const strVal = String(val);
+        if (strVal.includes(";") || strVal.includes('"') || strVal.includes("\n")) {
+          return `"${strVal.replace(/"/g, '""')}"`;
+        }
+        return strVal;
+      });
+      csvLines.push(cleanRow.join(";"));
+    });
+
+    return csvLines.join("\n");
+  } catch (e) {
+    console.error("Failed to export current assignments:", e);
+    throw new Error("No se pudo exportar la configuración actual.");
+  }
 }

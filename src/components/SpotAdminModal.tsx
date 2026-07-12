@@ -8,12 +8,14 @@ export default function SpotAdminModal({
     spot,
     onClose,
     onOpenAssignment,
-    onToggleType
+    onToggleType,
+    chargingEnabled
 }: {
     spot: any,
     onClose: () => void,
     onOpenAssignment: () => void,
-    onToggleType?: (updatedSpot: any) => void
+    onToggleType?: (updatedSpot: any) => void,
+    chargingEnabled: boolean
 }) {
     const [fee, setFee] = useState(spot.monthlyFee || 0);
     const [loading, setLoading] = useState(false);
@@ -91,28 +93,30 @@ export default function SpotAdminModal({
 
                 {spot.type === "RESERVED" ? (
                     <>
-                        <div style={modalStyles.section}>
-                            <div style={modalStyles.label}>Tarifa Mensual (Suscripción)</div>
-                            <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
-                                <div style={modalStyles.inputWrapper}>
-                                    <span style={{ color: "#94a3b8", fontWeight: "800" }}>$</span>
-                                    <input
-                                        type="text"
-                                        value={formatValue(fee)}
-                                        onChange={handleFeeChange}
-                                        style={modalStyles.input}
-                                        placeholder="0"
-                                    />
+                        {chargingEnabled && (
+                            <div style={modalStyles.section}>
+                                <div style={modalStyles.label}>Tarifa Mensual (Suscripción)</div>
+                                <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                                    <div style={modalStyles.inputWrapper}>
+                                        <span style={{ color: "#94a3b8", fontWeight: "800" }}>$</span>
+                                        <input
+                                            type="text"
+                                            value={formatValue(fee)}
+                                            onChange={handleFeeChange}
+                                            style={modalStyles.input}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleSaveFee}
+                                        disabled={loading}
+                                        style={{ ...modalStyles.actionBtn, background: "var(--primary)", color: "white" }}
+                                    >
+                                        Guardar Tarifa
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleSaveFee}
-                                    disabled={loading}
-                                    style={{ ...modalStyles.actionBtn, background: "var(--primary)", color: "white" }}
-                                >
-                                    Guardar Tarifa
-                                </button>
                             </div>
-                        </div>
+                        )}
 
                         <div style={{ ...modalStyles.section, border: "none" }}>
                             <div style={modalStyles.label}>Gestión de Abonado</div>
@@ -142,7 +146,7 @@ export default function SpotAdminModal({
                                 color: "white"
                             }}
                         >
-                            {spot.isOccupied ? "🏁 Registrar Salida / Cobro" : "🚗 Registrar Entrada Manual"}
+                            {spot.isOccupied ? (chargingEnabled ? "🏁 Registrar Salida / Cobro" : "🏁 Registrar Salida") : "🚗 Registrar Entrada Manual"}
                         </button>
                     </div>
                 )}

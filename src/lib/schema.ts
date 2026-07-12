@@ -72,6 +72,11 @@ const pgStaffMembers = pgTable("staff_members", {
   assignedSpotId: pgInteger("assigned_spot_id").references(() => parkingSpots.id),
   vacationStart: pgTimestamp("vacation_start"),
   vacationEnd: pgTimestamp("vacation_end"),
+  isAllDay: pgBoolean("is_all_day").default(true).notNull(),
+  weekdays: pgText("weekdays"),
+  startTime: pgText("start_time"),
+  endTime: pgText("end_time"),
+  releasedDates: pgText("released_dates"),
 });
 
 const sqliteStaffMembers = sqliteTable("staff_members", {
@@ -83,6 +88,11 @@ const sqliteStaffMembers = sqliteTable("staff_members", {
   assignedSpotId: sqliteInteger("assigned_spot_id").references(() => parkingSpots.id),
   vacationStart: sqliteInteger("vacation_start", { mode: 'timestamp' }),
   vacationEnd: sqliteInteger("vacation_end", { mode: 'timestamp' }),
+  isAllDay: sqliteInteger("is_all_day", { mode: 'boolean' }).default(true).notNull(),
+  weekdays: sqliteText("weekdays"),
+  startTime: sqliteText("start_time"),
+  endTime: sqliteText("end_time"),
+  releasedDates: sqliteText("released_dates"),
 });
 
 export const staffMembers = (isPostgres ? pgStaffMembers : sqliteStaffMembers) as any;
@@ -98,6 +108,7 @@ const pgParkingRecords = pgTable("parking_records", {
   spotId: pgInteger("spot_id").references(() => parkingSpots.id),
   entryType: pgText("entry_type", { enum: ["AUTOMATIC", "MANUAL"] }).notNull(),
   cost: pgInteger("cost"),
+  visitorName: pgText("visitor_name"),
 });
 
 const sqliteParkingRecords = sqliteTable("parking_records", {
@@ -111,6 +122,7 @@ const sqliteParkingRecords = sqliteTable("parking_records", {
   spotId: sqliteInteger("spot_id").references(() => parkingSpots.id),
   entryType: sqliteText("entry_type").notNull(),
   cost: sqliteInteger("cost"),
+  visitorName: sqliteText("visitor_name"),
 });
 
 export const parkingRecords = (isPostgres ? pgParkingRecords : sqliteParkingRecords) as any;
