@@ -171,7 +171,13 @@ export default function ParkingGrid({
             if (result.success) {
                 updateSpotStatus(editingSpot.id, false);
                 setHasMovement(true);
-                setEditingSpot(prev => prev ? { ...prev, isOccupied: false, currentPlate: undefined } : null);
+                if (chargingEnabled) {
+                    // Si el cobro está activo, mantenemos temporalmente el modal con el recibo a cobrar.
+                    setEditingSpot(prev => prev ? { ...prev, currentPlate: undefined } : null);
+                } else {
+                    // Si no hay cobro activo, cerramos el modal de inmediato.
+                    setEditingSpot(null);
+                }
                 router.refresh();
                 return result;
             }
