@@ -1595,16 +1595,26 @@ export async function exportCurrentAssignmentsHTML() {
       return parts.map(p => mapping[p] || p).join(",");
     };
 
-    let logoHtml = "";
-    if (branding.logoUrl) {
-      if (branding.logoUrl.startsWith("data:image")) {
-        logoHtml = `<img src="${branding.logoUrl}" style="max-height: 60px; width: auto;" />`;
-      } else if (branding.logoUrl.startsWith("/")) {
-        logoHtml = `<img src="https://finisterrae.cl/wp-content/uploads/2021/04/logo-finis.png" style="max-height: 60px; width: auto;" />`;
-      } else {
-        logoHtml = `<img src="${branding.logoUrl}" style="max-height: 60px; width: auto;" />`;
-      }
-    }
+    const rowsHtml = list.map((s: any) => `
+      <tr>
+        <td style="font-weight: bold; color: #1e3a8a;">${s.spotCode || ""}</td>
+        <td style="font-weight: 600;">${s.name || ""}</td>
+        <td style="font-family: monospace; font-size: 13px; font-weight: bold; color: #475569;">${s.licensePlate || ""}</td>
+        <td>${s.phoneNumber || ""}</td>
+        <td style="text-align: center;">
+          ${s.isAllDay 
+            ? '<span class="badge-si">S&Iacute;</span>' 
+            : '<span class="badge-no">NO</span>'
+          }
+        </td>
+        <td>${mapWeekdaysToSpanish(s.weekdays)}</td>
+        <td>${s.startTime || ""}</td>
+        <td>${s.endTime || ""}</td>
+        <td>${formatDateStr(s.vacationStart)}</td>
+        <td>${formatDateStr(s.vacationEnd)}</td>
+        <td>${s.releasedDates || ""}</td>
+      </tr>
+    `).join("");
 
     const htmlContent = `
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -1643,13 +1653,10 @@ export async function exportCurrentAssignmentsHTML() {
 
   <table class="header-table">
     <tr>
-      <td style="width: 150px; text-align: center; vertical-align: middle;">
-        ${logoHtml || `<span style="font-size: 24px;">🚗</span>`}
-      </td>
-      <td style="vertical-align: middle; padding-left: 20px;">
+      <td style="vertical-align: middle; padding: 10px 0 20px 0;">
         <div class="title">${branding.companyName || "POCURO TORRE 1"}</div>
         <div class="subtitle">${branding.systemName || "Sistema de Control de Estacionamientos"}</div>
-        <div style="font-size: 11px; color: #94a3b8; margin-top: 5px;">Reporte Generado: ${new Date().toLocaleString('es-CL')}</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 5px; font-weight: 600;">Reporte de Abonados | Generado: ${new Date().toLocaleString('es-CL')}</div>
       </td>
     </tr>
   </table>
@@ -1671,26 +1678,7 @@ export async function exportCurrentAssignmentsHTML() {
       </tr>
     </thead>
     <tbody>
-      \${list.map((s: any) => \`
-        <tr>
-          <td style="font-weight: bold; color: #1e3a8a;">\${s.spotCode || ""}</td>
-          <td style="font-weight: 600;">\${s.name || ""}</td>
-          <td style="font-family: monospace; font-size: 13px; font-weight: bold; color: #475569;">\${s.licensePlate || ""}</td>
-          <td>\${s.phoneNumber || ""}</td>
-          <td style="text-align: center;">
-            \${s.isAllDay 
-              ? '<span class="badge-si">SÍ</span>' 
-              : '<span class="badge-no">NO</span>'
-            }
-          </td>
-          <td>\${mapWeekdaysToSpanish(s.weekdays)}</td>
-          <td>\${s.startTime || ""}</td>
-          <td>\${s.endTime || ""}</td>
-          <td>\${formatDateStr(s.vacationStart)}</td>
-          <td>\${formatDateStr(s.vacationEnd)}</td>
-          <td>\${s.releasedDates || ""}</td>
-        </tr>
-      \`).join("")}
+      ${rowsHtml}
     </tbody>
   </table>
 

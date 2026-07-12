@@ -257,7 +257,8 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
       alignItems: "center",
       justifyContent: "center",
       zIndex: 1000,
-      padding: "20px"
+      padding: "20px",
+      overflowY: "auto" as const
     },
     modal: {
       background: "white",
@@ -268,6 +269,7 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
       display: "flex",
       flexDirection: "column" as const,
       maxHeight: "90vh",
+      margin: "auto",
       overflow: "hidden"
     },
     header: {
