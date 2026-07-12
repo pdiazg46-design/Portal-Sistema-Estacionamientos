@@ -876,7 +876,7 @@ export default function ReservationModal({
             )}
 
             {/* Admin Type conversion */}
-            {isAdmin && !spot.isOccupied && !releaseResult && (
+            {isAdmin && !spot.isOccupied && !releaseResult && !visitorPlate && (
               <div style={{ ...styles.section, borderBottom: "none", marginTop: "auto" }}>
                 <h3 style={styles.sectionTitle}>🛠️ Administración del Sitio</h3>
                 {spot.type === "RESERVED" ? (
