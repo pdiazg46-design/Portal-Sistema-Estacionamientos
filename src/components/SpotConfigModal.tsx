@@ -170,8 +170,8 @@ export default function SpotConfigModal({ onClose }: { onClose: () => void }) {
         setIsRenaming(false);
     };
 
-    const handleDeleteTower = () => {
-        if (!confirm(`¿Estás seguro de eliminar completamente la ${selectedTower === "T1" ? "Torre 1" : selectedTower === "T2" ? "Torre 2" : selectedTower === "T3" ? "Torre 3" : selectedTower}? Se eliminarán todos sus casilleros.`)) {
+    const handleDeleteTower = async () => {
+        if (!await confirm(`¿Estás seguro de eliminar completamente la ${selectedTower === "T1" ? "Torre 1" : selectedTower === "T2" ? "Torre 2" : selectedTower === "T3" ? "Torre 3" : selectedTower}? Se eliminarán todos sus casilleros.`)) {
             return;
         }
 
@@ -210,9 +210,9 @@ export default function SpotConfigModal({ onClose }: { onClose: () => void }) {
         setNewLevelName("");
     };
 
-    const handleDeleteLevel = (lvl: string) => {
+    const handleDeleteLevel = async (lvl: string) => {
         if (currentLevels[lvl] > 0) {
-            if (!confirm(`El nivel ${lvl} tiene ${currentLevels[lvl]} sitios configurados. Si lo eliminas, estos sitios serán borrados. ¿Confirmar?`)) {
+            if (!await confirm(`El nivel ${lvl} tiene ${currentLevels[lvl]} sitios configurados. Si lo eliminas, estos sitios serán borrados. ¿Confirmar?`)) {
                 return;
             }
         }
@@ -246,7 +246,7 @@ export default function SpotConfigModal({ onClose }: { onClose: () => void }) {
                 await updateSpotCounts(levelsConfig, t, gateId);
             }
 
-            alert(`Configuración de Torres y Niveles guardada exitosamente.`);
+            await alert(`Configuración de Torres y Niveles guardada exitosamente.`);
             onClose();
             window.location.reload();
         } catch (e) {

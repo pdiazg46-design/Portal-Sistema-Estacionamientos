@@ -24,7 +24,7 @@ export default function AssignmentModal({ isOpen, onClose, onConfirm, spotCode, 
   };
 
   const handleConvert = async () => {
-    if (confirm("¿Está seguro de que desea cambiar este sitio a Reservado / Abonado?")) {
+    if (await confirm("¿Está seguro de que desea cambiar este sitio a Reservado / Abonado?")) {
       setLoading(true);
       try {
         if (onConvertToReserved) {

@@ -217,7 +217,7 @@ export default function ReservationModal({
   };
 
   const handleDeleteStaff = async (staffId: string, staffName: string) => {
-    if (confirm(`¿Seguro que desea eliminar la reserva de ${staffName}?`)) {
+    if (await confirm(`¿Seguro que desea eliminar la reserva de ${staffName}?`)) {
       setLoading(true);
       try {
         await onDeleteStaff(staffId);
@@ -230,7 +230,7 @@ export default function ReservationModal({
   };
 
   const handleDeleteAll = async () => {
-    if (confirm("ADVERTENCIA: ¿Seguro que desea eliminar a TODOS los abonados de este sitio?\nEl sitio quedará completamente LIBRE.")) {
+    if (await confirm("ADVERTENCIA: ¿Seguro que desea eliminar a TODOS los abonados de este sitio?\nEl sitio quedará completamente LIBRE.")) {
       setLoading(true);
       try {
         await onDeleteSpotAll();
@@ -244,7 +244,7 @@ export default function ReservationModal({
   };
 
   const handleConvertToGeneral = async () => {
-    if (confirm("ADVERTENCIA: ¿Está seguro de que desea cambiar este sitio a General? Se eliminarán todos los abonados y tramos registrados para este casillero.")) {
+    if (await confirm("ADVERTENCIA: ¿Está seguro de que desea cambiar este sitio a General? Se eliminarán todos los abonados y tramos registrados para este casillero.")) {
       setLoading(true);
       try {
         if (onConvertToGeneral) {
@@ -260,7 +260,7 @@ export default function ReservationModal({
   };
 
   const handleConvertToReserved = async () => {
-    if (confirm("¿Está seguro de que desea cambiar este sitio a Reservado / Abonado?")) {
+    if (await confirm("¿Está seguro de que desea cambiar este sitio a Reservado / Abonado?")) {
       setLoading(true);
       try {
         if (onConvertToReserved) {

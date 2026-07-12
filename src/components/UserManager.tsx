@@ -65,7 +65,7 @@ export default function UserManager() {
     };
 
     const handleDelete = async (id: string, username: string) => {
-        if (confirm(`¿Estás seguro de eliminar al usuario ${username}?`)) {
+        if (await confirm(`¿Estás seguro de eliminar al usuario ${username}?`)) {
             const res = await deleteUser(id);
             if (res.success) {
                 refreshUsers();

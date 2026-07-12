@@ -194,7 +194,7 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
     try {
       const result = await bulkUploadStaff(fileContent, overwriteAll, user?.username || "Admin");
       if (result.success) {
-        alert("¡Carga masiva aplicada exitosamente!");
+        await alert("¡Carga masiva aplicada exitosamente!");
         onClose();
         resetForm();
         window.location.reload();
