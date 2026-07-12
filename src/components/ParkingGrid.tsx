@@ -460,6 +460,22 @@ export default function ParkingGrid({
         })
     };
 
+    const levelsGrouped = spots.reduce((acc: { [key: string]: typeof spots }, spot) => {
+        const lvl = spot.level || "-1";
+        if (!acc[lvl]) acc[lvl] = [];
+        acc[lvl].push(spot);
+        return acc;
+    }, {});
+
+    const sortedLevels = Object.keys(levelsGrouped).sort((a, b) => {
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (!isNaN(numA) && !isNaN(numB)) {
+            return numB - numA;
+        }
+        return a.localeCompare(b);
+    });
+
     return (
         <div style={styles.mainContainer}>
 
