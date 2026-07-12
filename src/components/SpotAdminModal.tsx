@@ -26,15 +26,22 @@ export default function SpotAdminModal({
             return;
         }
         setLoading(true);
-        const newType = spot.type === "RESERVED" ? "GENERAL" : "RESERVED";
-        await toggleSpotType(spot.id);
-        
-        const updatedSpot = { ...spot, type: newType };
-        
-        if (onToggleType) {
-            onToggleType(updatedSpot);
-        } else {
-            window.location.reload();
+        try {
+            const newType = spot.type === "RESERVED" ? "GENERAL" : "RESERVED";
+            await toggleSpotType(spot.id);
+            
+            const updatedSpot = { ...spot, type: newType };
+            
+            if (onToggleType) {
+                onToggleType(updatedSpot);
+            } else {
+                window.location.reload();
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error al cambiar el tipo de sitio.");
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -55,9 +62,15 @@ export default function SpotAdminModal({
 
     async function handleSaveFee() {
         setLoading(true);
-        await updateSpotMonthlyFee(spot.id, fee);
-        setLoading(false);
-        alert("Tarifa mensual actualizada.");
+        try {
+            await updateSpotMonthlyFee(spot.id, fee);
+            alert("Tarifa mensual actualizada.");
+        } catch (e) {
+            console.error(e);
+            alert("Error al guardar la tarifa.");
+        } finally {
+            setLoading(false);
+        }
     }
 
     return (

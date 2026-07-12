@@ -47,18 +47,24 @@ export default function ReleaseModal({ isOpen, onClose, onRelease, spot, initial
 
     const handleRelease = async () => {
         setLoading(true);
-        const data = await onRelease();
-        if (data.success) {
-            setResult({
-                cost: data.cost,
-                durationInSeconds: data.durationInSeconds,
-                entryTime: data.entryTime,
-                exitTime: data.exitTime
-            });
-        } else {
-            onClose();
+        try {
+            const data = await onRelease();
+            if (data.success) {
+                setResult({
+                    cost: data.cost,
+                    durationInSeconds: data.durationInSeconds,
+                    entryTime: data.entryTime,
+                    exitTime: data.exitTime
+                });
+            } else {
+                onClose();
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error al procesar la salida del vehículo.");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const formatDuration = (seconds: number) => {

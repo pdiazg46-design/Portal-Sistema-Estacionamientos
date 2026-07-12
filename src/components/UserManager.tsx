@@ -41,21 +41,27 @@ export default function UserManager() {
         setError("");
         setLoading(true);
 
-        // Map data for Drizzle (ensure empty string becomes null for foreign key if needed, or just send it)
-        const finalData = {
-            ...formData,
-            accessId: formData.accessId === "" ? null : formData.accessId
-        };
+        try {
+            // Map data for Drizzle (ensure empty string becomes null for foreign key if needed, or just send it)
+            const finalData = {
+                ...formData,
+                accessId: formData.accessId === "" ? null : formData.accessId
+            };
 
-        const res = await createUser(finalData as any);
-        if (res.success) {
-            setShowCreate(false);
-            setFormData({ username: "", password: "", role: "OPERATOR", accessId: "" });
-            refreshUsers();
-        } else {
-            setError(res.message || "Error al crear usuario");
+            const res = await createUser(finalData as any);
+            if (res.success) {
+                setShowCreate(false);
+                setFormData({ username: "", password: "", role: "OPERATOR", accessId: "" });
+                refreshUsers();
+            } else {
+                setError(res.message || "Error al crear usuario");
+            }
+        } catch (e: any) {
+            console.error("Error creating user:", e);
+            setError(e.message || "Error interno al crear usuario");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleDelete = async (id: string, username: string) => {

@@ -33,9 +33,15 @@ export default function LogoUpload({ initialUrl, companyName }: LogoUploadProps)
         try {
             const reader = new FileReader();
             reader.onloadend = async () => {
-                const base64String = reader.result as string;
-                await updateBranding({ logoUrl: base64String });
-                window.location.reload(); // Refresh to show new logo
+                try {
+                    const base64String = reader.result as string;
+                    await updateBranding({ logoUrl: base64String });
+                    window.location.reload(); // Refresh to show new logo
+                } catch (error) {
+                    console.error(error);
+                    alert("Error al cargar el logo");
+                    setLoading(false);
+                }
             };
             reader.readAsDataURL(file);
         } catch (error) {

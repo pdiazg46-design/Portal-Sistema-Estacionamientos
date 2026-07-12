@@ -274,14 +274,21 @@ export default function ReservationModal({
     }
   };
 
-  const handleVisitorAssign = () => {
+  const handleVisitorAssign = async () => {
     if (!visitorPlate) {
       alert("Ingrese una patente para registrar ingreso.");
       return;
     }
     setLoading(true);
-    onAssignVisitor(visitorPlate, visitorName);
-    setVisitorName("");
+    try {
+      await onAssignVisitor(visitorPlate, visitorName);
+      setVisitorName("");
+    } catch (e) {
+      console.error(e);
+      alert("Error al registrar el ingreso de la visita.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRelease = async () => {
