@@ -80,11 +80,25 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
     
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setFileContent(text);
-      validateCSV(text);
+      const arrayBuffer = event.target?.result as ArrayBuffer;
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      let decodedText = "";
+      try {
+        // Intentar decodificar como UTF-8 estricto
+        const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+        decodedText = utf8Decoder.decode(uint8Array);
+      } catch (err) {
+        console.warn("UTF-8 decoding failed. Falling back to Windows-1252/ISO-8859-1.");
+        // Si falla (típico en CSV de Excel en español), decodificar como Windows-1252 / Latin-1
+        const latinDecoder = new TextDecoder("windows-1252");
+        decodedText = latinDecoder.decode(uint8Array);
+      }
+
+      setFileContent(decodedText);
+      validateCSV(decodedText);
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   // Perform client-side validations to give immediate feedback
