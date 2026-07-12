@@ -90,6 +90,7 @@ export default function ParkingGrid({
     const [hasMovement, setHasMovement] = useState(false); // Track changes for refresh
 
     const [filter, setFilter] = useState<"ALL" | "FREE" | "OCCUPIED" | "RESERVED">("ALL");
+    const [generalFilter, setGeneralFilter] = useState<"ALL" | "FREE" | "OCCUPIED" | "RESERVED">("ALL");
 
     const { isAdmin, assignedAccessId, isSuperAdmin } = useAuth();
     const [selectedTowerId, setSelectedTowerId] = useState<string>("ALL");
@@ -926,28 +927,99 @@ export default function ParkingGrid({
                     overflowY: "auto"
                 }} className="animate-fade-in">
                     <div style={{
-                        maxWidth: "1400px",
+                        maxWidth: "1280px",
                         margin: "0 auto",
                         width: "100%",
                         display: "flex",
                         flexDirection: "column",
-                        gap: "20px"
+                        gap: "15px"
                     }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <h2 style={{ color: "white", margin: 0, fontSize: "32px", fontWeight: "900" }}>
-                                🗺️ Vista General de Ocupación
-                            </h2>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "15px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                <h2 style={{ color: "white", margin: 0, fontSize: "28px", fontWeight: "900" }}>
+                                    🗺️ Vista General de Ocupación
+                                </h2>
+                            </div>
+                            
+                            {/* Local Filters inside General View */}
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                                <button
+                                    onClick={() => setGeneralFilter("ALL")}
+                                    style={{
+                                        padding: "6px 14px",
+                                        borderRadius: "20px",
+                                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                                        background: generalFilter === "ALL" ? "white" : "rgba(255, 255, 255, 0.1)",
+                                        color: generalFilter === "ALL" ? "var(--primary)" : "white",
+                                        fontWeight: "800",
+                                        fontSize: "12px",
+                                        cursor: "pointer",
+                                        transition: "all 0.2s ease"
+                                    }}
+                                >
+                                    Todos ({spots.length})
+                                </button>
+                                <button
+                                    onClick={() => setGeneralFilter("FREE")}
+                                    style={{
+                                        padding: "6px 14px",
+                                        borderRadius: "20px",
+                                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                                        background: generalFilter === "FREE" ? "white" : "rgba(255, 255, 255, 0.1)",
+                                        color: generalFilter === "FREE" ? "var(--primary)" : "white",
+                                        fontWeight: "800",
+                                        fontSize: "12px",
+                                        cursor: "pointer",
+                                        transition: "all 0.2s ease"
+                                    }}
+                                >
+                                    Libres ({spots.filter(isSpotFree).length})
+                                </button>
+                                <button
+                                    onClick={() => setGeneralFilter("OCCUPIED")}
+                                    style={{
+                                        padding: "6px 14px",
+                                        borderRadius: "20px",
+                                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                                        background: generalFilter === "OCCUPIED" ? "white" : "rgba(255, 255, 255, 0.1)",
+                                        color: generalFilter === "OCCUPIED" ? "var(--primary)" : "white",
+                                        fontWeight: "800",
+                                        fontSize: "12px",
+                                        cursor: "pointer",
+                                        transition: "all 0.2s ease"
+                                    }}
+                                >
+                                    Ocupados ({spots.filter(s => s.isOccupied).length})
+                                </button>
+                                <button
+                                    onClick={() => setGeneralFilter("RESERVED")}
+                                    style={{
+                                        padding: "6px 14px",
+                                        borderRadius: "20px",
+                                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                                        background: generalFilter === "RESERVED" ? "white" : "rgba(255, 255, 255, 0.1)",
+                                        color: generalFilter === "RESERVED" ? "var(--primary)" : "white",
+                                        fontWeight: "800",
+                                        fontSize: "12px",
+                                        cursor: "pointer",
+                                        transition: "all 0.2s ease"
+                                    }}
+                                >
+                                    Reservados ({spots.filter(s => s.type === "RESERVED").length})
+                                </button>
+                            </div>
+
                             <button
                                 onClick={() => setIsMapExpanded(false)}
                                 style={{
-                                    padding: "12px 24px",
-                                    background: "white",
-                                    color: "var(--primary)",
+                                    padding: "8px 18px",
+                                    background: "#f43f5e",
+                                    color: "white",
                                     border: "none",
-                                    borderRadius: "12px",
+                                    borderRadius: "10px",
                                     fontWeight: "900",
                                     cursor: "pointer",
-                                    fontSize: "16px"
+                                    fontSize: "13px"
                                 }}
                             >
                                 ✕ CERRAR VISTA
@@ -956,32 +1028,42 @@ export default function ParkingGrid({
 
                         <div style={{
                             background: "white",
-                            padding: "30px",
-                            borderRadius: "20px",
+                            padding: "15px 25px",
+                            borderRadius: "16px",
                             display: "flex",
                             flexDirection: "column",
-                            gap: "30px"
+                            gap: "15px"
                         }}>
                             {sortedLevels.map((lvl) => {
-                                const spotsInLvl = levelsGrouped[lvl] || [];
+                                const rawSpots = levelsGrouped[lvl] || [];
+                                const spotsInLvl = rawSpots.filter((s) => {
+                                    if (generalFilter === "ALL") return true;
+                                    if (generalFilter === "FREE") return isSpotFree(s);
+                                    if (generalFilter === "OCCUPIED") return s.isOccupied;
+                                    if (generalFilter === "RESERVED") return s.type === "RESERVED";
+                                    return true;
+                                });
+
+                                if (spotsInLvl.length === 0) return null;
+
                                 return (
-                                    <div key={lvl} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                    <div key={lvl} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                         <div style={{ 
-                                            fontSize: "18px", 
+                                            fontSize: "14px", 
                                             fontWeight: "900", 
                                             color: "var(--primary)", 
                                             borderBottom: "2px solid #f1f5f9", 
-                                            paddingBottom: "8px",
+                                            paddingBottom: "4px",
                                             display: "flex",
                                             alignItems: "center",
-                                            gap: "8px"
+                                            gap: "6px"
                                         }}>
-                                            <span style={{ fontSize: "20px" }}>📍</span> Nivel {lvl}
+                                            <span style={{ fontSize: "16px" }}>📍</span> Nivel {lvl}
                                             <span style={{ 
-                                                fontSize: "11px", 
+                                                fontSize: "10px", 
                                                 background: "#f1f5f9", 
                                                 color: "#475569", 
-                                                padding: "2px 10px", 
+                                                padding: "1px 8px", 
                                                 borderRadius: "20px",
                                                 fontWeight: "800"
                                             }}>
@@ -990,8 +1072,8 @@ export default function ParkingGrid({
                                         </div>
                                         <div style={{
                                             display: "grid",
-                                            gridTemplateColumns: "repeat(auto-fill, minmax(115px, 1fr))",
-                                            gap: "10px"
+                                            gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))",
+                                            gap: "8px"
                                         }}>
                                             {spotsInLvl.map((spot) => {
                                                 const parts = spot.code.split('-');
@@ -1002,38 +1084,39 @@ export default function ParkingGrid({
                                                         key={spot.id}
                                                         style={{
                                                             ...styles.spot(spot.isOccupied, spot.type),
-                                                            height: "85px",
+                                                            height: "62px",
                                                             maxWidth: "none",
-                                                            padding: "6px"
+                                                            borderRadius: "8px",
+                                                            padding: "4px"
                                                         }}
                                                         onClick={() => {
                                                             handleSpotClick(spot);
                                                         }}
                                                     >
-                                                        <div style={{ position: "absolute", top: "5px", left: "8px", opacity: 0.5, fontSize: "9px", fontWeight: "700" }}>
+                                                        <div style={{ position: "absolute", top: "3px", left: "6px", opacity: 0.5, fontSize: "8px", fontWeight: "800" }}>
                                                             {spot.type === "RESERVED" ? "R" : "G"}
                                                         </div>
-                                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", marginTop: "8px" }}>
+                                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", marginTop: "6px" }}>
                                                             {spot.type === "RESERVED" ? (
-                                                                <div style={{ fontSize: "10px", opacity: 1, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "95%", color: "#0369a1" }} title={spot.ownerName || "RESERVADO"}>
+                                                                <div style={{ fontSize: "8px", opacity: 1, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "95%", color: "#0369a1" }} title={spot.ownerName || "RESERVADO"}>
                                                                     {spot.ownerName ? spot.ownerName.split(' ')[0] : "RESERVADO"}
                                                                 </div>
                                                             ) : (
-                                                                <div style={{ fontSize: "10px", opacity: 1, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "95%", color: "#15803d" }}>
+                                                                <div style={{ fontSize: "8px", opacity: 1, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "95%", color: "#15803d" }}>
                                                                     GENERAL
                                                                 </div>
                                                             )}
-                                                            <span style={{ fontSize: "20px", fontWeight: "900", color: "#1e293b", lineHeight: "1" }}>
+                                                            <span style={{ fontSize: "16px", fontWeight: "900", color: "#1e293b", lineHeight: "1" }}>
                                                                 {numberSuffix}
                                                             </span>
                                                             {spot.isOccupied ? (
                                                                 <div style={{
-                                                                    marginTop: "2px",
+                                                                    marginTop: "1px",
                                                                     background: "#ef4444",
                                                                     color: "white",
-                                                                    padding: "1px 4px",
-                                                                    borderRadius: "3px",
-                                                                    fontSize: "9px",
+                                                                    padding: "0px 3px",
+                                                                    borderRadius: "2px",
+                                                                    fontSize: "8px",
                                                                     fontWeight: "800",
                                                                     lineHeight: "1.2"
                                                                 }}>
@@ -1041,7 +1124,7 @@ export default function ParkingGrid({
                                                                 </div>
                                                             ) : (
                                                                 spot.type === "RESERVED" && (
-                                                                    <div style={{ fontSize: "9px", opacity: 0.8, color: "#475569", fontWeight: "700", marginTop: "2px" }}>
+                                                                    <div style={{ fontSize: "8px", opacity: 0.8, color: "#475569", fontWeight: "700", marginTop: "1px", lineHeight: "1" }}>
                                                                         {spot.ownerPlate || "LIBRE"}
                                                                     </div>
                                                                 )
