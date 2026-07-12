@@ -332,12 +332,35 @@ export default function ParkingGrid({
         return false;
     };
 
+    // Sort spots once at the component scope so everything is clean and numerically sorted
+    const sortedAllSpots = [...spots].sort((a, b) => {
+        // 1. Sort by towerId
+        if (a.towerId !== b.towerId) {
+            return (a.towerId || "").localeCompare(b.towerId || "");
+        }
+        // 2. Sort by level descending
+        const lvlA = parseInt(a.level || "-1");
+        const lvlB = parseInt(b.level || "-1");
+        const isNumA = !isNaN(lvlA);
+        const isNumB = !isNaN(lvlB);
+        
+        if (isNumA && isNumB) {
+            if (lvlA !== lvlB) return lvlB - lvlA;
+        } else if (a.level !== b.level) {
+            return (a.level || "").localeCompare(b.level || "");
+        }
+        // 3. Sort by numeric suffix of the code
+        const numA = parseInt(a.code.split('-').pop() || "0");
+        const numB = parseInt(b.code.split('-').pop() || "0");
+        return numA - numB;
+    });
+
     // filtering logic
-    const uniqueTowers = Array.from(new Set(spots.map(s => s.towerId))).filter(Boolean) as string[];
+    const uniqueTowers = Array.from(new Set(sortedAllSpots.map(s => s.towerId))).filter(Boolean) as string[];
 
     const towerFilteredSpots = selectedTowerId === "ALL"
-        ? spots
-        : spots.filter(s => s.towerId === selectedTowerId);
+        ? sortedAllSpots
+        : sortedAllSpots.filter(s => s.towerId === selectedTowerId);
 
     const filteredSpots = towerFilteredSpots.filter(s => {
         if (filter === "FREE") return isSpotFree(s);
@@ -461,7 +484,7 @@ export default function ParkingGrid({
         })
     };
 
-    const levelsGrouped = spots.reduce((acc: { [key: string]: typeof spots }, spot) => {
+    const levelsGrouped = sortedAllSpots.reduce((acc: { [key: string]: typeof spots }, spot) => {
         const lvl = spot.level || "-1";
         if (!acc[lvl]) acc[lvl] = [];
         acc[lvl].push(spot);

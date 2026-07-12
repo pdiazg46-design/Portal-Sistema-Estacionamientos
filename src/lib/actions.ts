@@ -831,9 +831,10 @@ export async function updateSpotCounts(
       const currentCount = levelSpots.length;
 
       if (targetCount > currentCount) {
-        // Add new spots to this level
+        // Add new spots to this level (Optimized: Batch Insert)
+        const spotsToAdd = [];
         for (let i = currentCount + 1; i <= targetCount; i++) {
-          await tx.insert(parkingSpots).values({
+          spotsToAdd.push({
             code: `${towerId}-TEMP`, // Code will be renumbered below
             towerId,
             level: lvl,
@@ -841,6 +842,9 @@ export async function updateSpotCounts(
             type: "GENERAL",
             isOccupied: false
           });
+        }
+        if (spotsToAdd.length > 0) {
+          await tx.insert(parkingSpots).values(spotsToAdd);
         }
       } else if (targetCount < currentCount) {
         // Remove spots from the end of this level, but only if not occupied
@@ -891,13 +895,17 @@ export async function updateSpotCounts(
       return a.id - b.id;
     });
 
+    // Optimized: Only run UPDATE queries if the code or accessId actually changed!
     for (const [idx, spot] of finalSpots.entries()) {
-      await tx.update(parkingSpots)
-        .set({
-          code: `${towerId}-${(idx + 1).toString().padStart(2, '0')}`,
-          accessId: targetGateId
-        })
-        .where(eq(parkingSpots.id, spot.id));
+      const expectedCode = `${towerId}-${(idx + 1).toString().padStart(2, '0')}`;
+      if (spot.code !== expectedCode || spot.accessId !== targetGateId) {
+        await tx.update(parkingSpots)
+          .set({
+            code: expectedCode,
+            accessId: targetGateId
+          })
+          .where(eq(parkingSpots.id, spot.id));
+      }
     }
   });
 
