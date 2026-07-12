@@ -468,7 +468,7 @@ export default function ParkingGrid({
                 <div style={{ ...styles.controlPanel, marginBottom: "20px" }}>
                     <div style={{ ...styles.panelTitle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <span>🗺️</span> Layout de Estacionamientos
+                            <span>🗺️</span> POCURO TORRE 1
                             {isAdmin && (
                                 <select
                                     value={selectedTowerId}
@@ -591,9 +591,13 @@ export default function ParkingGrid({
                                                     </div>
 
                                                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", marginTop: "12px", marginBottom: "2px" }}>
-                                                        {prefix && (
-                                                            <div style={{ fontSize: "8px", opacity: 0.9, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", color: "#475569" }}>
-                                                                {prefix}
+                                                        {spot.type === "RESERVED" ? (
+                                                            <div style={{ fontSize: "8px", opacity: 0.9, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", color: "#0ea5e9" }} title={spot.ownerName || "RESERVADO"}>
+                                                                {spot.ownerName || "RESERVADO"}
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ fontSize: "8px", opacity: 0.9, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", color: "#16a34a" }}>
+                                                                GENERAL
                                                             </div>
                                                         )}
                                                         <span style={{ fontSize: "22px", fontWeight: "900", color: "#1e293b", lineHeight: "1" }}>
@@ -625,12 +629,6 @@ export default function ParkingGrid({
                                                         }}>
                                                             ⏱️ {spot.entryTime ? formatTimeElapsed(spot.entryTime) : "???"}
                                                         </div>
-
-                                                        {spot.type === "RESERVED" && spot.ownerName && (
-                                                            <span style={{ fontSize: "10px", marginTop: "4px", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
-                                                                {spot.ownerName.split(' ')[0]}
-                                                            </span>
-                                                        )}
                                                     </>
                                                 ) : (
                                                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
