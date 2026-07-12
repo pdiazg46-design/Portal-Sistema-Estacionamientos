@@ -22,7 +22,7 @@ type ReservationModalProps = {
   }) => Promise<void>;
   onDeleteStaff: (staffId: string) => Promise<void>;
   onDeleteSpotAll: () => Promise<void>;
-  onAssignVisitor: (plate: string, visitorName?: string) => void;
+  onAssignVisitor: (plate: string, visitorName?: string) => Promise<boolean>;
   onReleaseSpot: () => Promise<{ success: boolean; cost: number; durationInSeconds: number; entryTime?: Date | null; exitTime?: Date | null }>;
   onConvertToGeneral: () => Promise<void>;
   onConvertToReserved: () => Promise<void>;
@@ -281,8 +281,11 @@ export default function ReservationModal({
     }
     setLoading(true);
     try {
-      await onAssignVisitor(visitorPlate, visitorName);
-      setVisitorName("");
+      const success = await onAssignVisitor(visitorPlate, visitorName);
+      if (success) {
+        setVisitorName("");
+        onClose();
+      }
     } catch (e) {
       console.error(e);
       alert("Error al registrar el ingreso de la visita.");

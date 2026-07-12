@@ -257,8 +257,8 @@ export default function ParkingGrid({
         }
     }
 
-    async function handleAssignVisitor(plate: string, visitorName?: string) {
-        if (!editingSpot) return;
+    async function handleAssignVisitor(plate: string, visitorName?: string): Promise<boolean> {
+        if (!editingSpot) return false;
         const finalPlate = plate || "VISITA";
         try {
             await occupySpot(editingSpot.id, finalPlate, "MANUAL", undefined, visitorName);
@@ -266,9 +266,11 @@ export default function ParkingGrid({
             setEditingSpot(prev => prev ? { ...prev, isOccupied: true, currentPlate: finalPlate, currentVisitorName: visitorName } : null);
             setPlateInput("");
             router.refresh();
+            return true;
         } catch (e) {
             console.error(e);
             alert("Error asignando visita");
+            return false;
         }
     }
 
