@@ -1555,3 +1555,152 @@ export async function exportCurrentAssignments() {
     throw new Error("No se pudo exportar la configuración actual.");
   }
 }
+
+export async function exportCurrentAssignmentsHTML() {
+  try {
+    const list = await db.select({
+      spotCode: parkingSpots.code,
+      name: staffMembers.name,
+      licensePlate: staffMembers.licensePlate,
+      phoneNumber: staffMembers.phoneNumber,
+      isAllDay: staffMembers.isAllDay,
+      weekdays: staffMembers.weekdays,
+      startTime: staffMembers.startTime,
+      endTime: staffMembers.endTime,
+      vacationStart: staffMembers.vacationStart,
+      vacationEnd: staffMembers.vacationEnd,
+      releasedDates: staffMembers.releasedDates
+    })
+    .from(staffMembers)
+    .innerJoin(parkingSpots, eq(staffMembers.assignedSpotId, parkingSpots.id));
+
+    const branding = await getBranding();
+
+    const formatDateStr = (date: any): string => {
+      if (!date) return "";
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "";
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const mapWeekdaysToSpanish = (weekdaysStr: string | null | undefined): string => {
+      if (!weekdaysStr) return "";
+      const parts = weekdaysStr.split(",").map(d => d.trim().toUpperCase());
+      const mapping: { [key: string]: string } = {
+        "MON": "LUN", "TUE": "MAR", "WED": "MIE", "THU": "JUE", "FRI": "VIE", "SAT": "SAB", "SUN": "DOM"
+      };
+      return parts.map(p => mapping[p] || p).join(",");
+    };
+
+    let logoHtml = "";
+    if (branding.logoUrl) {
+      if (branding.logoUrl.startsWith("data:image")) {
+        logoHtml = `<img src="${branding.logoUrl}" style="max-height: 60px; width: auto;" />`;
+      } else if (branding.logoUrl.startsWith("/")) {
+        logoHtml = `<img src="https://finisterrae.cl/wp-content/uploads/2021/04/logo-finis.png" style="max-height: 60px; width: auto;" />`;
+      } else {
+        logoHtml = `<img src="${branding.logoUrl}" style="max-height: 60px; width: auto;" />`;
+      }
+    }
+
+    const htmlContent = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <!--[if gte mso 9]>
+  <xml>
+    <x:ExcelWorkbook>
+      <x:ExcelWorksheets>
+        <x:ExcelWorksheet>
+          <x:Name>Abonados</x:Name>
+          <x:WorksheetOptions>
+            <x:DisplayGridlines/>
+          </x:WorksheetOptions>
+        </x:ExcelWorksheet>
+      </x:ExcelWorksheets>
+    </x:ExcelWorkbook>
+  </xml>
+  <![endif]-->
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 20px; }
+    .header-table { width: 100%; margin-bottom: 20px; border-collapse: collapse; }
+    .header-table td { border: none; padding: 10px; }
+    .title { font-size: 22px; font-weight: 800; color: #1e3a8a; }
+    .subtitle { font-size: 13px; color: #64748b; font-weight: 600; }
+    
+    .data-table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    .data-table th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; font-size: 12px; text-transform: uppercase; padding: 10px; border: 1px solid #cbd5e1; text-align: left; }
+    .data-table td { padding: 8px 10px; border: 1px solid #cbd5e1; font-size: 12px; color: #334155; }
+    .data-table tr:nth-child(even) { background-color: #f8fafc; }
+    .badge-si { background-color: #dcfce7; color: #15803d; font-weight: bold; padding: 2px 6px; border-radius: 4px; text-align: center; }
+    .badge-no { background-color: #fee2e2; color: #b91c1c; font-weight: bold; padding: 2px 6px; border-radius: 4px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <table class="header-table">
+    <tr>
+      <td style="width: 150px; text-align: center; vertical-align: middle;">
+        ${logoHtml || `<span style="font-size: 24px;">🚗</span>`}
+      </td>
+      <td style="vertical-align: middle; padding-left: 20px;">
+        <div class="title">${branding.companyName || "POCURO TORRE 1"}</div>
+        <div class="subtitle">${branding.systemName || "Sistema de Control de Estacionamientos"}</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 5px;">Reporte Generado: ${new Date().toLocaleString('es-CL')}</div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Sitio</th>
+        <th>Nombre Propietario</th>
+        <th>Patente</th>
+        <th>Teléfono</th>
+        <th>Todo el Día (Fijo)</th>
+        <th>Días</th>
+        <th>Hora Inicio</th>
+        <th>Hora Fin</th>
+        <th>Vacaciones Desde</th>
+        <th>Vacaciones Hasta</th>
+        <th>Fechas Liberadas</th>
+      </tr>
+    </thead>
+    <tbody>
+      \${list.map((s: any) => \`
+        <tr>
+          <td style="font-weight: bold; color: #1e3a8a;">\${s.spotCode || ""}</td>
+          <td style="font-weight: 600;">\${s.name || ""}</td>
+          <td style="font-family: monospace; font-size: 13px; font-weight: bold; color: #475569;">\${s.licensePlate || ""}</td>
+          <td>\${s.phoneNumber || ""}</td>
+          <td style="text-align: center;">
+            \${s.isAllDay 
+              ? '<span class="badge-si">SÍ</span>' 
+              : '<span class="badge-no">NO</span>'
+            }
+          </td>
+          <td>\${mapWeekdaysToSpanish(s.weekdays)}</td>
+          <td>\${s.startTime || ""}</td>
+          <td>\${s.endTime || ""}</td>
+          <td>\${formatDateStr(s.vacationStart)}</td>
+          <td>\${formatDateStr(s.vacationEnd)}</td>
+          <td>\${s.releasedDates || ""}</td>
+        </tr>
+      \`).join("")}
+    </tbody>
+  </table>
+
+</body>
+</html>
+    `;
+
+    return htmlContent;
+  } catch (e) {
+    console.error("Failed to export current assignments as HTML:", e);
+    throw new Error("No se pudo exportar la plantilla con diseño.");
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { bulkUploadStaff, exportCurrentAssignments, getLastBulkUpload } from "@/lib/actions";
+import { bulkUploadStaff, exportCurrentAssignments, exportCurrentAssignmentsHTML, getLastBulkUpload } from "@/lib/actions";
 
 interface BulkUploadModalProps {
   isOpen: boolean;
@@ -52,11 +52,11 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
 
   if (!isOpen) return null;
 
-  // Export current assignments as CSV
+  // Export current assignments as CSV (with UTF-8 BOM to fix Excel tilde corruption)
   const handleDownloadCurrent = async () => {
     try {
       const csvContent = await exportCurrentAssignments();
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
@@ -70,6 +70,27 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
       document.body.removeChild(link);
     } catch (e) {
       alert("Error al descargar la configuración actual.");
+    }
+  };
+
+  // Export current assignments as styled HTML Excel Report
+  const handleDownloadHTML = async () => {
+    try {
+      const htmlContent = await exportCurrentAssignmentsHTML();
+      const blob = new Blob(["\uFEFF" + htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      link.setAttribute("download", `reporte_abonados_${dateStr}.xls`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      alert("Error al descargar el reporte diseñado.");
     }
   };
 
@@ -387,13 +408,36 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
         <div style={styles.body}>
           {/* Step 1: Download Configuration */}
           <div>
-            <h4 style={styles.sectionTitle}>Paso 1: Descargar base actual para modificar</h4>
+            <h4 style={styles.sectionTitle}>Paso 1: Descargar base actual</h4>
             <p style={{ fontSize: "12px", color: "#64748b", margin: "4px 0 12px 0", lineHeight: "1.4" }}>
-              Descarga la configuración actual de abonados en formato CSV. Podrás abrirla directamente en Excel, editarla, añadir o quitar filas, y luego volver a guardarla en Excel para cargarla aquí.
+              Tienes dos opciones para descargar la información de abonados y horarios:
             </p>
-            <button style={styles.btnSecondary} onClick={handleDownloadCurrent}>
-              📊 Descargar Configuración Actual
-            </button>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "10px" }}>
+              <button 
+                style={{ 
+                  ...styles.btnPrimary, 
+                  background: "#10b981", 
+                  fontSize: "12px",
+                  padding: "8px 16px"
+                }} 
+                onClick={handleDownloadHTML}
+              >
+                📊 Descargar Reporte Diseñado (Excel)
+              </button>
+              <button 
+                style={{ 
+                  ...styles.btnSecondary, 
+                  fontSize: "12px",
+                  padding: "8px 16px"
+                }} 
+                onClick={handleDownloadCurrent}
+              >
+                ⚙️ Descargar Plantilla CSV (Para Carga Masiva)
+              </button>
+            </div>
+            <p style={{ fontSize: "11px", color: "#64748b", margin: "4px 0 0 0", lineHeight: "1.3" }}>
+              💡 <strong>Nota:</strong> Utiliza la <em>Plantilla CSV</em> si necesitas realizar modificaciones masivas y volver a subir el archivo. El <em>Reporte Diseñado</em> es ideal para imprimir, compartir o enviar a administración.
+            </p>
           </div>
 
           <hr style={{ border: 0, borderTop: "1px solid #e2e8f0", margin: "4px 0" }} />
