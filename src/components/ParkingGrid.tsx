@@ -592,11 +592,11 @@ export default function ParkingGrid({
 
                                                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", marginTop: "12px", marginBottom: "2px" }}>
                                                         {spot.type === "RESERVED" ? (
-                                                            <div style={{ fontSize: "8px", opacity: 0.9, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", color: "#0ea5e9" }} title={spot.ownerName || "RESERVADO"}>
+                                                            <div style={{ fontSize: "10px", opacity: 1, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "95%", color: "#0369a1" }} title={spot.ownerName || "RESERVADO"}>
                                                                 {spot.ownerName || "RESERVADO"}
                                                             </div>
                                                         ) : (
-                                                            <div style={{ fontSize: "8px", opacity: 0.9, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", color: "#16a34a" }}>
+                                                            <div style={{ fontSize: "10px", opacity: 1, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "95%", color: "#15803d" }}>
                                                                 GENERAL
                                                             </div>
                                                         )}
