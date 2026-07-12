@@ -942,47 +942,98 @@ export default function ParkingGrid({
                             background: "white",
                             padding: "30px",
                             borderRadius: "20px",
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fill, minmax(105px, 1fr))",
-                            gap: "10px"
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "30px"
                         }}>
-                            {spots.map((spot) => {
-                                const parts = spot.code.split('-');
-                                const numberSuffix = parts[parts.length - 1];
-                                const prefix = parts.slice(0, -1).join('-');
-
+                            {sortedLevels.map((lvl) => {
+                                const spotsInLvl = levelsGrouped[lvl] || [];
                                 return (
-                                    <div
-                                        key={spot.id}
-                                        style={{
-                                            ...styles.spot(spot.isOccupied, spot.type),
-                                            height: "80px", // Fix height for grid consistency
-                                            maxWidth: "none"
-                                        }}
-                                        onClick={() => {
-                                            handleSpotClick(spot);
-                                        }}
-                                    >
-                                        <div style={{ position: "absolute", top: "5px", left: "8px", opacity: 0.5, fontSize: "10px" }}>
-                                            {spot.type === "RESERVED" ? "R" : "G"}
-                                        </div>
-                                        <div style={{ position: "absolute", top: "5px", right: "8px", opacity: 0.9, fontSize: "9px", fontWeight: "800", color: "#334155" }}>
-                                            N{spot.level || "-1"}
-                                        </div>
-                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", marginTop: "6px" }}>
-                                            {prefix && (
-                                                <div style={{ fontSize: "7px", opacity: 0.9, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "90%", color: "#475569", marginBottom: "1px" }}>
-                                                    {prefix}
-                                                </div>
-                                            )}
-                                            <span style={{ fontSize: "20px", fontWeight: "900", color: "#1e293b", lineHeight: "1" }}>
-                                                {numberSuffix}
+                                    <div key={lvl} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                        <div style={{ 
+                                            fontSize: "18px", 
+                                            fontWeight: "900", 
+                                            color: "var(--primary)", 
+                                            borderBottom: "2px solid #f1f5f9", 
+                                            paddingBottom: "8px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px"
+                                        }}>
+                                            <span style={{ fontSize: "20px" }}>📍</span> Nivel {lvl}
+                                            <span style={{ 
+                                                fontSize: "11px", 
+                                                background: "#f1f5f9", 
+                                                color: "#475569", 
+                                                padding: "2px 10px", 
+                                                borderRadius: "20px",
+                                                fontWeight: "800"
+                                            }}>
+                                                {spotsInLvl.length} sitios
                                             </span>
-                                            {spot.isOccupied && (
-                                                <div style={{ fontSize: "8px", fontWeight: "800", color: "#991b1b", marginTop: "1px" }}>
-                                                    {spot.entryTime ? formatTimeElapsed(spot.entryTime) : ""}
-                                                </div>
-                                            )}
+                                        </div>
+                                        <div style={{
+                                            display: "grid",
+                                            gridTemplateColumns: "repeat(auto-fill, minmax(115px, 1fr))",
+                                            gap: "10px"
+                                        }}>
+                                            {spotsInLvl.map((spot) => {
+                                                const parts = spot.code.split('-');
+                                                const numberSuffix = parts[parts.length - 1];
+
+                                                return (
+                                                    <div
+                                                        key={spot.id}
+                                                        style={{
+                                                            ...styles.spot(spot.isOccupied, spot.type),
+                                                            height: "85px",
+                                                            maxWidth: "none",
+                                                            padding: "6px"
+                                                        }}
+                                                        onClick={() => {
+                                                            handleSpotClick(spot);
+                                                        }}
+                                                    >
+                                                        <div style={{ position: "absolute", top: "5px", left: "8px", opacity: 0.5, fontSize: "9px", fontWeight: "700" }}>
+                                                            {spot.type === "RESERVED" ? "R" : "G"}
+                                                        </div>
+                                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", marginTop: "8px" }}>
+                                                            {spot.type === "RESERVED" ? (
+                                                                <div style={{ fontSize: "10px", opacity: 1, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "95%", color: "#0369a1" }} title={spot.ownerName || "RESERVADO"}>
+                                                                    {spot.ownerName ? spot.ownerName.split(' ')[0] : "RESERVADO"}
+                                                                </div>
+                                                            ) : (
+                                                                <div style={{ fontSize: "10px", opacity: 1, textTransform: "uppercase", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "95%", color: "#15803d" }}>
+                                                                    GENERAL
+                                                                </div>
+                                                            )}
+                                                            <span style={{ fontSize: "20px", fontWeight: "900", color: "#1e293b", lineHeight: "1" }}>
+                                                                {numberSuffix}
+                                                            </span>
+                                                            {spot.isOccupied ? (
+                                                                <div style={{
+                                                                    marginTop: "2px",
+                                                                    background: "#ef4444",
+                                                                    color: "white",
+                                                                    padding: "1px 4px",
+                                                                    borderRadius: "3px",
+                                                                    fontSize: "9px",
+                                                                    fontWeight: "800",
+                                                                    lineHeight: "1.2"
+                                                                }}>
+                                                                    {spot.currentPlate || "???"}
+                                                                </div>
+                                                            ) : (
+                                                                spot.type === "RESERVED" && (
+                                                                    <div style={{ fontSize: "9px", opacity: 0.8, color: "#475569", fontWeight: "700", marginTop: "2px" }}>
+                                                                        {spot.ownerPlate || "LIBRE"}
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 );
