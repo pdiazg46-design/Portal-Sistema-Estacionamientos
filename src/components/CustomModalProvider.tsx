@@ -53,6 +53,20 @@ export default function CustomModalProvider({ children }: { children: React.Reac
         setModal(prev => ({ ...prev, isOpen: false }));
     };
 
+    const isSuccess = modal.message && /exito|éxito|exitosamente|exitoso|exitosas|guardado|guardó|guardaron|correcto|correctamente|creado|creada|actualizado|actualizada|eliminado|eliminada|aceptado|habilitado|deshabilitado|aplicado|aplicada|sincronizado|sincronizada/i.test(modal.message);
+
+    const getIcon = () => {
+        if (modal.type === "confirm") return "❓";
+        if (isSuccess) return "✅";
+        return "⚠️";
+    };
+
+    const getTitle = () => {
+        if (modal.type === "confirm") return "Confirmación";
+        if (isSuccess) return "Operación Exitosa";
+        return "Aviso del Sistema";
+    };
+
     const styles = {
         overlay: {
             position: "fixed" as const,
@@ -91,8 +105,12 @@ export default function CustomModalProvider({ children }: { children: React.Reac
             justifyContent: "center",
             fontSize: "26px",
             marginBottom: "20px",
-            background: modal.type === "confirm" ? "#fef3c7" : "#fee2e2",
-            color: modal.type === "confirm" ? "#b45309" : "#b91c1c",
+            background: modal.type === "confirm" 
+                ? "#fef3c7" 
+                : (isSuccess ? "#dcfce7" : "#fee2e2"),
+            color: modal.type === "confirm" 
+                ? "#b45309" 
+                : (isSuccess ? "#15803d" : "#b91c1c"),
             boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.05)"
         },
         title: {
@@ -123,10 +141,14 @@ export default function CustomModalProvider({ children }: { children: React.Reac
             fontWeight: "800",
             fontSize: "14px",
             cursor: "pointer",
-            background: modal.type === "confirm" ? "var(--primary)" : "#dc2626",
+            background: modal.type === "confirm" 
+                ? "var(--primary)" 
+                : (isSuccess ? "#10b981" : "#dc2626"),
             color: "white",
             transition: "all 0.2s ease",
-            boxShadow: modal.type === "confirm" ? "0 4px 12px rgba(3, 105, 161, 0.2)" : "0 4px 12px rgba(220, 38, 38, 0.2)"
+            boxShadow: modal.type === "confirm" 
+                ? "0 4px 12px rgba(3, 105, 161, 0.2)" 
+                : (isSuccess ? "0 4px 12px rgba(16, 185, 129, 0.2)" : "0 4px 12px rgba(220, 38, 38, 0.2)")
         },
         btnCancel: {
             flex: 1,
@@ -149,10 +171,10 @@ export default function CustomModalProvider({ children }: { children: React.Reac
                 <div style={styles.overlay}>
                     <div style={styles.container}>
                         <div style={styles.iconWrapper}>
-                            {modal.type === "confirm" ? "❓" : "⚠️"}
+                            {getIcon()}
                         </div>
                         <h4 style={styles.title}>
-                            {modal.type === "confirm" ? "Confirmación" : "Aviso del Sistema"}
+                            {getTitle()}
                         </h4>
                         <p style={styles.message}>{modal.message}</p>
                         <div style={styles.buttonGroup}>
