@@ -256,7 +256,7 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      zIndex: 1000,
+      zIndex: 30000,
       padding: "20px",
       overflowY: "auto" as const
     },
