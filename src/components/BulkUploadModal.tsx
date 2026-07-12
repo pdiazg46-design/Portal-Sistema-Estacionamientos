@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { bulkUploadStaff, exportCurrentAssignments, exportCurrentAssignmentsHTML, getLastBulkUpload } from "@/lib/actions";
 
@@ -11,6 +12,13 @@ interface BulkUploadModalProps {
 
 export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProps) {
   const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
   const [fileContent, setFileContent] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
   const [overwriteAll, setOverwriteAll] = useState<boolean>(false);
@@ -399,7 +407,9 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
     return `${d}-${m}-${y} a las ${hr}:${min} hrs`;
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div style={styles.overlay}>
       <div style={styles.modal}>
         <div style={styles.header}>
@@ -541,6 +551,7 @@ export default function BulkUploadModal({ isOpen, onClose }: BulkUploadModalProp
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
